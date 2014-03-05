@@ -1,0 +1,79 @@
+﻿<Window x:Class="AttachmentMailer.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+		xmlns:src="clr-namespace:AttachmentMailer"
+        Title="MainWindow" Height="500" Width="600" HorizontalAlignment="Center">
+	<StackPanel x:Name="mainListLayout" Margin="10" Loaded="mainListLayout_Loaded">
+		<Label x:Name="msgLabel" Content="Status"/>
+		<Grid Margin="0,10">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto"/>
+				<ColumnDefinition Width="1*"/>
+				<ColumnDefinition Width="Auto"/>
+			</Grid.ColumnDefinitions>
+			<Label Content="Email column (column number of email address. E.g. 4): " VerticalAlignment="Center" Grid.Column="0"/>
+			<TextBox x:Name="emailColumn" Text="" Grid.Column="1" VerticalAlignment="Center" Margin="10,0"/>
+			<Button Click="updateEmailButton_Click"  x:Name="updateEmailButton" Content="Update Preview" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="2" Padding="5,1"/>
+		</Grid>
+		<GroupBox Header="Attachment to add">
+			<StackPanel HorizontalAlignment="Left" VerticalAlignment="Center">
+				<Label Content="Input Attachment filename. E.g. &quot;{4} {5} Document.pdf&quot; (Where 4 and 5 are column numbers):"/>
+				<Grid x:Name="addAttachContainer" Margin="0,10">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="5*"/>
+						<ColumnDefinition Width="5*"/>
+						<ColumnDefinition Width="Auto"/>
+						<ColumnDefinition Width="Auto"/>
+					</Grid.ColumnDefinitions>
+					<TextBox x:Name="addAttachInput" TextWrapping="Wrap" VerticalAlignment="Center" Grid.Column="0"/>
+					<Label x:Name="addFolderLabel" Content="" Grid.Column="1" VerticalAlignment="Center" Margin="10,0"/>
+					<Button Click="addFolderButton_Click"  x:Name="addFolderButton" Content="Browse..." VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="2" Padding="5,1"/>
+					<Button Click="addAttachButton_Click" x:Name="addAttachButton" Content="Add" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="3" Padding="5,1"/>
+				</Grid>
+			</StackPanel>
+		</GroupBox>
+			
+		<Grid>
+			<Grid.Resources>
+				<src:Datum x:Key="datum"/>
+			</Grid.Resources>
+
+			<ListBox x:Name="attachmentList" ItemsSource="{StaticResource datum}" Width="Auto" Margin="0,5,0,10" Height="100">
+				<ListBox.ItemTemplate>
+					<DataTemplate>
+						<StackPanel Orientation="Horizontal">
+							<TextBlock Padding="5,0,5,0"
+								Text="{Binding attachmentName}" />
+							<TextBlock Text=", " />
+							<TextBlock Text="{Binding location}" />
+						</StackPanel>
+					</DataTemplate>
+				</ListBox.ItemTemplate>
+			</ListBox>
+		</Grid>
+		<Button Click="remAttachButton_Click" x:Name="remAttachButton" Content="Remove Attachment"/>
+		<Grid Margin="0,10,0,0">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto"/>
+				<ColumnDefinition Width="3*"/>
+				<ColumnDefinition Width="Auto"/>
+				<ColumnDefinition Width="5*"/>
+			</Grid.ColumnDefinitions>
+			<Label Content="Preview: " VerticalAlignment="Center" Grid.Column="0"/>
+			<Label x:Name="previewEmail" Content="" Grid.Column="1" VerticalAlignment="Center" Margin="10,0"/>
+			<Label Content=" -&gt; " VerticalAlignment="Center" Grid.Column="2"/>
+			<Label x:Name="previewAttachment" Content="" Grid.Column="3" VerticalAlignment="Center" Margin="10,0"/>
+		</Grid>
+		<Grid Margin="0,10">
+			<Grid.ColumnDefinitions>
+				<ColumnDefinition Width="Auto"/>
+				<ColumnDefinition Width="1*"/>
+				<ColumnDefinition Width="Auto"/>
+			</Grid.ColumnDefinitions>
+			<Label Content="Select draft folder: " VerticalAlignment="Center" Grid.Column="0"/>
+			<Label x:Name="draftFolder" Content="" Grid.Column="1" VerticalAlignment="Center" Margin="10,0"/>
+			<Button Click="draftFolderbutton_Click"  x:Name="draftFolderbutton" Content="Browse Outlook folders..." VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="2" Padding="5,1"/>
+		</Grid>
+		<Button Click="doThings_Click" x:Name="doThings" Content="Go" Margin="0,10,0,0" HorizontalAlignment="Center"/>
+	</StackPanel>
+</Window>
