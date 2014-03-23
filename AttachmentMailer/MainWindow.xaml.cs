@@ -27,20 +27,16 @@ namespace AttachmentMailer
 		Outlook.Application outApp;
 		Outlook.NameSpace outNS;
 
-		ListBox attachments;
-		TextBox attachmentName;
-		Label attachmentFolder;
-		Label status;
-
 		Outlook.MAPIFolder folderMAPI;
 
 		public MainWindow()
 		{
+			Resources["Datum"] = new Datum();
+			Resources["DataReplacements"] = new DataReplacements();
 			InitializeComponent();
-
 		}
 
-		private void doThings_Click(object sender, RoutedEventArgs e)
+		private void createDraftsButton_Click(object sender, RoutedEventArgs e)
 		{
 			if (!checkApps())
 			{
@@ -49,13 +45,14 @@ namespace AttachmentMailer
 			
 			// check email field
 			int emailfield = getEmailColumn();
-			// check attachments
-			getAttachment();
-
+			if (emailfield == -1)
+			{
+				return;
+			}
 			Excel.Range selection = exApp.Selection;
 			if (selection == null)
 			{
-				status.Content = "Bad selection.";
+				statusLabel.Content = "Bad selection.";
 				return;
 			}
 
@@ -64,7 +61,7 @@ namespace AttachmentMailer
 			if (folderMAPI != null && (folderMAPI.Items.Count > 0)) {
 				orig = folderMAPI.Items[1];
 			} else {
-				status.Content = "Cannot find draft email.";
+				statusLabel.Content = "Cannot find draft email.";
 				return;
 			}
 
@@ -77,14 +74,15 @@ namespace AttachmentMailer
 			{
 				Outlook._MailItem newMI = orig.Copy();
 				newMI.To = row.Cells[emailfield].Value2;
-				foreach (Data d in attachments.ItemsSource) {
+				foreach (Data d in attachmentList.ItemsSource)
+				{
 					String fname = processAttachmentName(d.attachmentName, row);
 					fname = System.IO.Path.Combine(d.location, fname);
 					try
 					{
 						newMI.Attachments.Add(fname);
 					}
-					catch (System.IO.FileNotFoundException ex)
+					catch (System.IO.FileNotFoundException)
 					{
 						if (!missingAttachment)
 						{
@@ -96,18 +94,46 @@ namespace AttachmentMailer
 							missingAttachments = String.Concat(missingAttachments, "\n" + fname);
 						}
 					}
+
+
 				}
+				try 
+				{
+					// do body replacements
+					try
+					{
+						string msg = newMI.HTMLBody;
+						foreach (DataReplace dr in replacementList.ItemsSource)
+						{
+							msg = msg.Replace(dr.placeholder, row.Cells[dr.replacement].Value2);
+						}
+						newMI.HTMLBody = msg;
+					}
+					catch (System.Runtime.InteropServices.COMException)
+					{
+						statusLabel.Content = "Access denied. You need to change Outlook settings";
+						newMI.Close(Outlook.OlInspectorClose.olDiscard);
+						return;
+					}
+				}
+				catch (Exception)
+				{
+					statusLabel.Content = "Something broke.";
+					return;
+				}
+								
+
 				newMI.Move(drafts);
 				//newMI.Close(Outlook.OlInspectorClose.olSave);
 			}
 
 			if (missingAttachment) {
 				Console.WriteLine("Missing: " + missingAttachments);
-				status.Content = missingAttachments;
+				statusLabel.Content = missingAttachments;
 			}
 			else
 			{
-				status.Content = "Done.";
+				statusLabel.Content = "Done.";
 			}
 			orig.Close(Outlook.OlInspectorClose.olDiscard); //discard
 
@@ -115,41 +141,52 @@ namespace AttachmentMailer
 
 		private void addAttachButton_Click(object sender, RoutedEventArgs e)
 		{
-			if (attachmentFolder.Content.Equals(""))
+			if (addAttachFolderLabel.Content.Equals(""))
 			{
-				status.Content = "Invalid folder.";
-			} else if (attachmentFolder.Content.Equals("-1"))
+				statusLabel.Content = "Invalid folder.";
+			}
+			else if (addAttachFolderLabel.Content.Equals("-1"))
 			{
-				status.Content = "Invalid folder.";
+				statusLabel.Content = "Invalid folder.";
 			} else
 			{
-				((Datum)attachments.ItemsSource).Add(new Data(attachmentFolder.Content.ToString(), attachmentName.Text));
+				((Datum)attachmentList.ItemsSource).Add(new Data(addAttachFolderLabel.Content.ToString(), addAttachInput.Text));
 				
 			}
-			attachmentFolder.Content = "";
+			addAttachFolderLabel.Content = "";
 		}
 
 		private void remAttachButton_Click(object sender, RoutedEventArgs e)
 		{
 			List<Data> dr = new List<Data>();
-			foreach( Data d in attachments.SelectedItems) {
+			foreach (Data d in attachmentList.SelectedItems)
+			{
 				dr.Add(d);
 			}
 			foreach (Data d in dr)
 			{
-				((Datum)attachments.ItemsSource).Remove(d);
+				((Datum)attachmentList.ItemsSource).Remove(d);
 			}
 		}
 
 		private Data getAttachment()
 		{
-			System.Collections.IEnumerator ie = attachments.ItemsSource.GetEnumerator();
+			System.Collections.IEnumerator ie = attachmentList.ItemsSource.GetEnumerator();
 			if (!ie.MoveNext())
 			{
-				status.Content = "No attachments.";
 				return null;
 			}
 			return ((Data)ie.Current);
+		}
+
+		private DataReplace getReplacement()
+		{
+			System.Collections.IEnumerator ie = replacementList.ItemsSource.GetEnumerator();
+			if (!ie.MoveNext())
+			{
+				return null;
+			}
+			return ((DataReplace)ie.Current);
 		}
 
 		private int getEmailColumn()
@@ -160,18 +197,37 @@ namespace AttachmentMailer
 				emailindex = Convert.ToInt32(emailColumn.Text);
 				if (emailindex <= 0)
 				{
-					status.Content = "Invalid column number for email address. Must be greater than 0.";
+					statusLabel.Content = "Invalid column number for email address. Must be greater than 0.";
 					return -1;
 				}
 			}
 			catch (FormatException)
 			{
-				status.Content = "Invalid column number for email address.";
+				statusLabel.Content = "Invalid column number for email address.";
 				return -1;
 			}
 			return emailindex;
 		}
 
+		private int getReplaceColumn()
+		{
+			int replaceindex;
+			try
+			{
+				replaceindex = Convert.ToInt32(replaceWithCol.Text);
+				if (replaceindex <= 0)
+				{
+					statusLabel.Content = "Invalid column number for replacement. Must be greater than 0.";
+					return -1;
+				}
+			}
+			catch (FormatException)
+			{
+				statusLabel.Content = "Invalid column number for replacement.";
+				return -1;
+			}
+			return replaceindex;
+		}
 
 
 		private void addFolderButton_Click(object sender, RoutedEventArgs e)
@@ -182,11 +238,11 @@ namespace AttachmentMailer
 			System.Windows.Forms.DialogResult result = folderBrowser.ShowDialog();
 			if (result == System.Windows.Forms.DialogResult.OK)
 			{
-				attachmentFolder.Content = folderBrowser.SelectedPath;
+				addAttachFolderLabel.Content = folderBrowser.SelectedPath;
 			}
 			else
 			{
-				attachmentFolder.Content = "-1";
+				addAttachFolderLabel.Content = "-1";
 			}
 		}
 
@@ -201,7 +257,7 @@ namespace AttachmentMailer
 				Console.WriteLine("Match trim: " + index);
 				if (index <= 0)
 				{
-					status.Content = "Invalid column number.";
+					statusLabel.Content = "Invalid column number.";
 					return null;
 				}
 				matched = true;
@@ -229,31 +285,47 @@ namespace AttachmentMailer
 			TextBox emailColumn = (TextBox) this.FindName("emailColumn");
 
 			int emailindex = getEmailColumn();
-			if (emailindex == -1)
+			int replaceindex = getReplaceColumn();
+			if ( (emailindex == -1) || (replaceindex == -1) )
 			{
 				return;
 			}
 
 			Data adata = getAttachment();
-			if (adata == null) {
-				return;
-			}
-
+			DataReplace rdata = getReplacement();
+			
 			Excel.Range selection = exApp.Selection;
 			if (selection == null)
 			{
-				status.Content = "Bad selection. Try re-opening Excel.";
+				statusLabel.Content = "Bad selection. Try re-opening Excel.";
 				return;
 			}
 			//selection = selection.CurrentRegion;
 			foreach (Excel.Range row in selection.Rows)
 			{
 				previewEmail.Content = row.Cells[emailindex].Value2;
-				previewAttachment.Content = processAttachmentName(adata.attachmentName, row);
+				if (adata == null)
+				{
+					previewAttachment.Content = "";
+				}
+				else
+				{
+					previewAttachment.Content = processAttachmentName(adata.attachmentName, row);
+				}
+				if (rdata == null)
+				{
+					previewReplace.Content = "";
+					previewPlaceholder.Content = "";
+				}
+				else
+				{
+					previewPlaceholder.Content = rdata.placeholder;
+					previewReplace.Content = rdata.placeholder.Replace(rdata.placeholder, row.Cells[rdata.replacement].Value2);
+				}
 				
 				break;
 			}
-			status.Content = "Ready.";
+			statusLabel.Content = "Ready.";
 		}
 
 		private void draftFolderbutton_Click(object sender, RoutedEventArgs e)
@@ -281,57 +353,113 @@ namespace AttachmentMailer
 			}
 		}
 
-		private bool checkApps()
+		private bool checkApps(bool excel)
 		{
-			try
+			if (excel)
 			{
-				exApp = (Excel.Application)System.Runtime.InteropServices.Marshal.GetActiveObject("Excel.Application");
-			}
-			catch (System.Runtime.InteropServices.COMException ex)
-			{
-				status.Content = "Excel couldn't be accessed. Excel not open?";
-				return false;
-			}
+				try
+				{
+					exApp = (Excel.Application)System.Runtime.InteropServices.Marshal.GetActiveObject("Excel.Application");
+				}
+				catch (System.Runtime.InteropServices.COMException)
+				{
+					statusLabel.Content = "Excel couldn't be accessed. Excel not open?";
+					return false;
+				}
 
-			if (exApp == null)
-			{
-				status.Content = "Excel couldn't be accessed. Excel not open?";
-				return false;
+				if (exApp == null)
+				{
+					statusLabel.Content = "Excel couldn't be accessed. Excel not open?";
+					return false;
+				}
 			}
-
 			try
 			{
 				outApp = (Outlook.Application)System.Runtime.InteropServices.Marshal.GetActiveObject("Outlook.Application");
 			}
 			catch (System.Runtime.InteropServices.COMException ex)
 			{
-				status.Content = "Outlook couldn't be accessed. Outlook not open?" + ex;
+				statusLabel.Content = "Outlook couldn't be accessed. Outlook not open?" + ex;
 				return false;
 			}
 			if (outApp == null)
 			{
-				status.Content = "Outlook couldn't be accessed. Outlook not open?";
+				statusLabel.Content = "Outlook couldn't be accessed. Outlook not open?";
 			}
 			outNS = outApp.GetNamespace("MAPI");
 
 			if (outNS == null)
 			{
-				status.Content = "Uh oh... Bad things happened.";
+				statusLabel.Content = "Uh oh... Bad things happened.";
 				return false;
 			}
 			return true;
 		}
 
+		private bool checkApps()
+		{
+			return checkApps(true);
+		}
+
 		private void mainListLayout_Loaded(object sender, RoutedEventArgs e)
 		{
-			attachments = (ListBox)this.FindName("attachmentList");
-			attachmentName = (TextBox)this.FindName("addAttachInput");
-			attachmentFolder = (Label)this.FindName("addFolderLabel");
-			status = (Label)this.FindName("msgLabel");
-
-			status.Content = "Ready.";
+			statusLabel.Content = "Ready.";
 			Console.WriteLine("\nREADY TO DO THINGS\n");
 
+		}
+
+		private void remReplaceButton_Click(object sender, RoutedEventArgs e)
+		{
+			List<DataReplace> dr = new List<DataReplace>();
+			foreach (DataReplace d in replacementList.SelectedItems)
+			{
+				dr.Add(d);
+			}
+			foreach (DataReplace d in dr)
+			{
+				((DataReplacements)replacementList.ItemsSource).Remove(d);
+			}
+		}
+
+		private void addReplaceButton_Click(object sender, RoutedEventArgs e)
+		{
+			int replaceindex = getReplaceColumn();
+
+			if (placeholderText.Text.Equals(""))
+			{
+				statusLabel.Content = "Invalid placeholder.";
+				return;
+			}
+			else if (replaceindex == -1)
+			{
+				return;
+			}
+			else
+			{
+				((DataReplacements)replacementList.ItemsSource).Add(new DataReplace(placeholderText.Text, replaceindex));
+
+			}
+		}
+
+		private void sendDraftsButton_Click(object sender, RoutedEventArgs e)
+		{
+			if (!checkApps(false))
+			{
+				return;
+			}
+			Outlook.MAPIFolder drafts = outNS.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderDrafts);
+			try {
+				foreach (Outlook._MailItem mi in drafts.Items)
+				{
+					mi.Send();
+				}
+			} catch (System.Runtime.InteropServices.COMException) {
+				statusLabel.Content = "Access denied. Try changing Outlook's security settings.";
+				return;
+			} catch (Exception) {
+				statusLabel.Content = "Other error. What happen?";
+				return;
+			}
 		}
 	}
 }
