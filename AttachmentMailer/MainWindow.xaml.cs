@@ -273,6 +273,18 @@ namespace AttachmentMailer
 			}
 		}
 
+		private Object getFirst(System.Collections.IEnumerator ie)
+		{
+			if (!ie.MoveNext())
+			{
+				return null;
+			}
+			else 
+			{
+				return ie.Current;
+			}
+		}
+
 		private void updateEmailButton_Click(object sender, RoutedEventArgs e)
 		{
 			if (!checkApps())
@@ -285,14 +297,15 @@ namespace AttachmentMailer
 			TextBox emailColumn = (TextBox) this.FindName("emailColumn");
 
 			int emailindex = getEmailColumn();
-			int replaceindex = getReplaceColumn();
-			if ( (emailindex == -1) || (replaceindex == -1) )
+
+			if ( (emailindex == -1) )
 			{
 				return;
 			}
 
-			Data adata = getAttachment();
-			DataReplace rdata = getReplacement();
+			Data adata = (Data) getFirst(attachmentList.ItemsSource.GetEnumerator());
+
+			DataReplace rdata = (DataReplace) getFirst(replacementList.ItemsSource.GetEnumerator());
 			
 			Excel.Range selection = exApp.Selection;
 			if (selection == null)
