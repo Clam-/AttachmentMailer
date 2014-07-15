@@ -2,7 +2,7 @@ Attachment Mailer for .net (Uses Microsoft Excel and Microsoft Outlook.
 
 This is a program that will help with sending attachments with filenames that are generated from a spreadsheet to email addreses in that same sheet.
 
-It currently uses a draft e-mail you have created (in a separate Outlook folder) and generates the attachment mails from that in your Draft folder. (Tip: You can press Enter to open a message then ALT+S to send. Repeat these 2 key presses to send many e-mails easily. This program will eventually do the sending for you but not at the moment.)
+It currently uses a draft e-mail you have created (in a separate Outlook folder) and generates the attachment mails from that in your main Draft folder. You can then use the program to send the drafts that are waiting in your main Draft folder. It may only send a few drafts each click.
 
 Common workflow is:
 
