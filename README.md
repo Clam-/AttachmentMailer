@@ -5,4 +5,4 @@ This is a program that will help with sending attachments with filenames that ar
 It uses a draft e-mail you have created (in a separate Outlook folder) and generates the attachment mails from that in your main Draft folder. You can then use the program to send the drafts that are waiting in your main Draft folder. It may only send a few drafts each click.  
 It can apply replacements in the draft e-mail such as replacing {Firstname} with data in a column from the spreadsheet you are pulling the e-mail addresses from.
 
-See [[Help]] for detailed instruction.
+See [Help](https://github.com/Clam-/AttachmentMailer/wiki/Help) for detailed instruction.
