@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,39 +7,44 @@ using System.Threading.Tasks;
 namespace AttachmentMailer
 {
 	
-	public class Data
+	public class Attachment
 	{
 		public String location { get; set; }
 		public String attachmentName { get; set; }
 
-		public Data() { }
-		public Data(String location, String attachmentName)
+		public Attachment() { }
+		public Attachment(String location, String attachmentName)
 		{
 			this.location = location;
 			this.attachmentName = attachmentName;
 		}
 	}
 
-	public class Datum : ObservableCollection<Data>
+	public class Document
 	{
-		public Datum() { }
+		public String location { get; set; }
+		public String attachmentFormat { get; set; }
+		public String attachmentName { get; set; }
+
+		public Document() { }
+		public Document(String location, String attachmentFormat)
+		{
+			this.location = location;
+			this.attachmentFormat = attachmentFormat;
+		}
 	}
 
-	public class DataReplace
+	public class Replacement
 	{
 		public string placeholder { get; set; }
 		public int replacement { get; set; }
 
-		public DataReplace() { }
-		public DataReplace(string placeholder, int replacement)
+		public Replacement() { }
+		public Replacement(string placeholder, int replacement)
 		{
 			this.placeholder = placeholder;
 			this.replacement = replacement;
 		}
 	}
 
-	public class DataReplacements : ObservableCollection<DataReplace>
-	{
-		public DataReplacements() { }
-	}
 }

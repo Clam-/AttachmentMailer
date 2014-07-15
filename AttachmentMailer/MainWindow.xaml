@@ -2,170 +2,244 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 		xmlns:src="clr-namespace:AttachmentMailer"
-        Title="MainWindow" Height="600" Width="600" HorizontalAlignment="Center">
-	<Grid x:Name="mainListLayout" Margin="10" Loaded="mainListLayout_Loaded">
+        Title="Attachment Mailer" Height="700" Width="600" HorizontalAlignment="Center" Closing="Window_Closing"
+		Closed="Window_Closed">
+	<Grid x:Name="mainListLayout" >
 		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="10*"/>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="7*"/>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="1*"/>
 			<RowDefinition Height="Auto"/>
 		</Grid.RowDefinitions>
-		<Label x:Name="statusLabel" Content="Status" Grid.Row="0"/>
-		<GroupBox Header="Attachments" Grid.Row="1" Padding="5">
+		<Grid x:Name="inputSections" Margin="10" Loaded="mainListLayout_Loaded" Grid.Row="0">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="7*"/>
+				<RowDefinition Height="7*"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="6*"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="Auto"/>
+			</Grid.RowDefinitions>
 			<Grid>
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto" />
-					<RowDefinition Height="2*" />
-					<RowDefinition Height="Auto" />
-				</Grid.RowDefinitions>
-				<GroupBox Header="Add attachment" Grid.Row="0">
-					<StackPanel VerticalAlignment="Center">
-						<Label Content="Input Attachment filename. E.g. &quot;{4} {5} Document.pdf&quot; (Where 4 and 5 are column numbers):"/>
-						<Grid x:Name="addAttachContainer" Margin="0,10">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="1*"/>
+					<ColumnDefinition Width="auto"/>
+				</Grid.ColumnDefinitions>
+				<Label x:Name="statusLabel" Content="Status" Grid.Row="0" Grid.Column="0"/>
+				<Button Click="helpButton_Click" x:Name="helpButton" Content="Show help..." Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" />
+			</Grid>
+			<GroupBox Header="Merged Documents" Grid.Row="1" Padding="5">
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="1*" />
+					</Grid.RowDefinitions>
+					<GroupBox Header="Add document" Grid.Row="0">
+						<StackPanel VerticalAlignment="Center">
+							<Label Content="Input Attachment name. E.g. &quot;{First} {Last} letter.pdf&quot; (Where First and Last are column headers):"/>
+							<Grid x:Name="addDocumentContainer" Margin="0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="Auto"/>
+									<ColumnDefinition Width="4*"/>
+									<ColumnDefinition Width="Auto"/>
+									<ColumnDefinition Width="Auto"/>
+									<ColumnDefinition Width="5*"/>
+									<ColumnDefinition Width="1*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<Label Content="Document:" Grid.Column="0" VerticalAlignment="Center" />
+								<Label x:Name="addDocLocationLabel" Content="" Grid.Column="1" VerticalAlignment="Center" Margin="10,0"/>
+								<Button Click="addDocFileButton_Click"  x:Name="addDocFileButton" Content="Browse..." VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="2" Padding="5,1"/>
+								<Label Content="Attachment name:" Grid.Column="3" VerticalAlignment="Center" />
+								<TextBox x:Name="addDocName" TextWrapping="Wrap" VerticalAlignment="Center" Grid.Column="4"/>
+								<Button Click="addDocumentButton_Click" x:Name="addDocumentButton" Content="Add" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="6" Padding="5,1"/>
+							</Grid>
+						</StackPanel>
+					</GroupBox>
+
+					<Grid Grid.Row="1">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="1*" />
+							<ColumnDefinition Width="Auto" />
+						</Grid.ColumnDefinitions>
+
+						<ListBox x:Name="documentList" ItemsSource="{DynamicResource Docs}" Width="Auto" Margin="0,10,10,0" Grid.Column="0">
+							<ListBox.ItemTemplate>
+								<DataTemplate>
+									<StackPanel Orientation="Horizontal">
+										<TextBlock Padding="5,0,5,0" Text="{Binding attachmentFormat}" />
+										<TextBlock Text=", " />
+										<TextBlock Text="{Binding location}" />
+									</StackPanel>
+								</DataTemplate>
+							</ListBox.ItemTemplate>
+						</ListBox>
+						<Button Click="remDocButton_Click" x:Name="remDocButton" Content="Remove" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,10,0,0" Padding="5,1" />
+					</Grid>
+				</Grid>
+			</GroupBox>
+
+			<GroupBox Header="Attachments" Grid.Row="2" Padding="5">
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto" />
+						<RowDefinition Height="2*" />
+						<RowDefinition Height="Auto" />
+					</Grid.RowDefinitions>
+					<GroupBox Header="Add attachment" Grid.Row="0">
+						<StackPanel VerticalAlignment="Center">
+							<Label Content="Input Attachment filename. E.g. &quot;{4} {5} Document.pdf&quot; (Where 4 and 5 are column numbers):"/>
+							<Grid x:Name="addAttachContainer" Margin="0">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="Auto"/>
+									<ColumnDefinition Width="5*"/>
+									<ColumnDefinition Width="Auto"/>
+									<ColumnDefinition Width="5*"/>
+									<ColumnDefinition Width="Auto"/>
+									<ColumnDefinition Width="1*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<Label Content="Filename:" Grid.Column="0" VerticalAlignment="Center" />
+								<TextBox x:Name="addAttachInput" TextWrapping="Wrap" VerticalAlignment="Center" Grid.Column="1"/>
+								<Label Content="Folder:" Grid.Column="2" VerticalAlignment="Center" />
+								<Label x:Name="addAttachFolderLabel" Content="" Grid.Column="3" VerticalAlignment="Center" Margin="10,0"/>
+								<Button Click="addFolderButton_Click"  x:Name="addFolderButton" Content="Browse..." VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="4" Padding="5,1"/>
+								<Button Click="addAttachButton_Click" x:Name="addAttachButton" Content="Add" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="6" Padding="5,1"/>
+							</Grid>
+						</StackPanel>
+					</GroupBox>
+
+					<Grid Grid.Row="1">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="1*" />
+							<ColumnDefinition Width="Auto" />
+						</Grid.ColumnDefinitions>
+
+						<ListBox x:Name="attachmentList" ItemsSource="{DynamicResource Attachments}" Width="Auto" Margin="0,10,10,0" Grid.Column="0">
+							<ListBox.ItemTemplate>
+								<DataTemplate>
+									<StackPanel Orientation="Horizontal">
+										<TextBlock Padding="5,0,5,0"
+									Text="{Binding attachmentName}" />
+										<TextBlock Text=", " />
+										<TextBlock Text="{Binding location}" />
+									</StackPanel>
+								</DataTemplate>
+							</ListBox.ItemTemplate>
+						</ListBox>
+						<Button Click="remAttachButton_Click" x:Name="remAttachButton" Content="Remove" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,10,0,0" Padding="5,1" />
+					</Grid>
+				</Grid>
+			</GroupBox>
+
+			<Grid Margin="0,10,0,5" Grid.Row="3">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="1*"/>
+					<ColumnDefinition Width="Auto"/>
+				</Grid.ColumnDefinitions>
+				<Label Content="Select draft folder: " VerticalAlignment="Center" Grid.Column="0"/>
+				<Label x:Name="draftFolder" Content="" Grid.Column="1" VerticalAlignment="Center" Margin="10,0"/>
+				<Button Click="draftFolderbutton_Click"  x:Name="draftFolderbutton" Content="Browse Outlook folders..." VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="2" Padding="5,1"/>
+			</Grid>
+			<GroupBox Header="Replacements" Grid.Row="4" Padding="5">
+				<Grid>
+					<Grid.RowDefinitions>
+						<RowDefinition Height="Auto"/>
+						<RowDefinition Height="1*" />
+					</Grid.RowDefinitions>
+					<GroupBox Header="Add Replacement" Grid.Row="0">
+						<Grid>
 							<Grid.ColumnDefinitions>
 								<ColumnDefinition Width="Auto"/>
-								<ColumnDefinition Width="5*"/>
-								<ColumnDefinition Width="Auto"/>
-								<ColumnDefinition Width="5*"/>
+								<ColumnDefinition Width="3*"/>
 								<ColumnDefinition Width="Auto"/>
 								<ColumnDefinition Width="1*"/>
 								<ColumnDefinition Width="Auto"/>
 							</Grid.ColumnDefinitions>
-							<Label Content="Filename:" Grid.Column="0" VerticalAlignment="Center" />
-							<TextBox x:Name="addAttachInput" TextWrapping="Wrap" VerticalAlignment="Center" Grid.Column="1"/>
-							<Label Content="Folder:" Grid.Column="2" VerticalAlignment="Center" />
-							<Label x:Name="addAttachFolderLabel" Content="" Grid.Column="3" VerticalAlignment="Center" Margin="10,0"/>
-							<Button Click="addFolderButton_Click"  x:Name="addFolderButton" Content="Browse..." VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="4" Padding="5,1"/>
-							<Button Click="addAttachButton_Click" x:Name="addAttachButton" Content="Add" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="6" Padding="5,1"/>
+							<Label Content="Placeholder:" Grid.Column="0" VerticalAlignment="Center"/>
+							<TextBox x:Name="placeholderText" Grid.Column="1" VerticalAlignment="Center"/>
+							<Label Content="Replace with data in column no.:" Grid.Column="2" VerticalAlignment="Center"/>
+							<TextBox x:Name="replaceWithCol" Grid.Column="3" VerticalAlignment="Center"/>
+							<Button Click="addReplaceButton_Click" x:Name="addReplaceButton" Content="Add" Grid.Column="4" VerticalAlignment="Center" Padding="5,1" Margin="5"/>
 						</Grid>
-					</StackPanel>
-				</GroupBox>
-
-				<Grid Grid.Row="1">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="1*" />
-						<ColumnDefinition Width="Auto" />
-					</Grid.ColumnDefinitions>
-
-					<ListBox x:Name="attachmentList" ItemsSource="{DynamicResource Datum}" Width="Auto" Margin="0,10,10,0" Grid.Column="0">
-						<ListBox.ItemTemplate>
-							<DataTemplate>
-								<StackPanel Orientation="Horizontal">
-									<TextBlock Padding="5,0,5,0"
-								Text="{Binding attachmentName}" />
-									<TextBlock Text=", " />
-									<TextBlock Text="{Binding location}" />
-								</StackPanel>
-							</DataTemplate>
-						</ListBox.ItemTemplate>
-					</ListBox>
-					<Button Click="remAttachButton_Click" x:Name="remAttachButton" Content="Remove" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,10,0,0" Padding="5,1" />
-				</Grid>
-			</Grid>
-		</GroupBox>
-
-		<Grid Margin="0,10" Grid.Row="2">
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="Auto"/>
-				<ColumnDefinition Width="1*"/>
-				<ColumnDefinition Width="Auto"/>
-			</Grid.ColumnDefinitions>
-			<Label Content="Select draft folder: " VerticalAlignment="Center" Grid.Column="0"/>
-			<Label x:Name="draftFolder" Content="" Grid.Column="1" VerticalAlignment="Center" Margin="10,0"/>
-			<Button Click="draftFolderbutton_Click"  x:Name="draftFolderbutton" Content="Browse Outlook folders..." VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="2" Padding="5,1"/>
-		</Grid>
-		<GroupBox Header="Replacements" Grid.Row="3" Padding="5">
-			<Grid>
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto"/>
-					<RowDefinition Height="1*" />
-				</Grid.RowDefinitions>
-				<GroupBox Header="Add Replacement" Grid.Row="0">
-					<Grid>
+					</GroupBox>
+					<Grid Grid.Row="1">
 						<Grid.ColumnDefinitions>
-							<ColumnDefinition Width="Auto"/>
-							<ColumnDefinition Width="3*"/>
-							<ColumnDefinition Width="Auto"/>
-							<ColumnDefinition Width="1*"/>
-							<ColumnDefinition Width="Auto"/>
+							<ColumnDefinition Width="1*" />
+							<ColumnDefinition Width="Auto" />
 						</Grid.ColumnDefinitions>
-						<Label Content="Placeholder:" Grid.Column="0" VerticalAlignment="Center"/>
-						<TextBox x:Name="placeholderText" Grid.Column="1" VerticalAlignment="Center"/>
-						<Label Content="Replace with data in column no.:" Grid.Column="2" VerticalAlignment="Center"/>
-						<TextBox x:Name="replaceWithCol" Grid.Column="3" VerticalAlignment="Center"/>
-						<Button Click="addReplaceButton_Click" x:Name="addReplaceButton" Content="Add" Grid.Column="4" VerticalAlignment="Center" Padding="5,1" Margin="5"/>
-					</Grid>
-				</GroupBox>
-				<Grid Grid.Row="1">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="1*" />
-						<ColumnDefinition Width="Auto" />
-					</Grid.ColumnDefinitions>
 
-					<ListBox x:Name="replacementList" ItemsSource="{DynamicResource DataReplacements}" Width="Auto" Height="Auto">
-						<ListBox.ItemTemplate>
-							<DataTemplate>
-								<StackPanel Orientation="Horizontal">
-									<TextBlock Padding="5,0,5,0"
-										Text="{Binding placeholder}" />
-									<TextBlock Text=" -> " />
-									<TextBlock Text="{Binding replacement}" />
-								</StackPanel>
-							</DataTemplate>
-						</ListBox.ItemTemplate>
-					</ListBox>
-					<Button Click="remReplaceButton_Click"  x:Name="remReplaceButton" Content="Remove" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0,0,0" Padding="5,1" />
+						<ListBox x:Name="replacementList" ItemsSource="{DynamicResource Replacements}" Width="Auto" Height="Auto">
+							<ListBox.ItemTemplate>
+								<DataTemplate>
+									<StackPanel Orientation="Horizontal">
+										<TextBlock Padding="5,0,5,0"
+											Text="{Binding placeholder}" />
+										<TextBlock Text=" -> " />
+										<TextBlock Text="{Binding replacement}" />
+									</StackPanel>
+								</DataTemplate>
+							</ListBox.ItemTemplate>
+						</ListBox>
+						<Button Click="remReplaceButton_Click"  x:Name="remReplaceButton" Content="Remove" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,0,0,0" Padding="5,1" />
+					</Grid>
 				</Grid>
+			</GroupBox>
+			<Grid Margin="0,10" Grid.Row="5">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="1*"/>
+					<ColumnDefinition Width="Auto"/>
+				</Grid.ColumnDefinitions>
+				<Label Content="Email column (column number of email address. E.g. 4): " VerticalAlignment="Center" Grid.Column="0"/>
+				<TextBox x:Name="emailColumn" Text="" Grid.Column="1" VerticalAlignment="Center" Margin="10,0"/>
+				<Button Click="updateEmailButton_Click"  x:Name="updateEmailButton" Content="Update Preview" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="2" Padding="5,1"/>
 			</Grid>
-		</GroupBox>
-		<Grid Margin="0,10" Grid.Row="4">
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="Auto"/>
-				<ColumnDefinition Width="1*"/>
-				<ColumnDefinition Width="Auto"/>
-			</Grid.ColumnDefinitions>
-			<Label Content="Email column (column number of email address. E.g. 4): " VerticalAlignment="Center" Grid.Column="0"/>
-			<TextBox x:Name="emailColumn" Text="" Grid.Column="1" VerticalAlignment="Center" Margin="10,0"/>
-			<Button Click="updateEmailButton_Click"  x:Name="updateEmailButton" Content="Update Preview" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="2" Padding="5,1"/>
+			<Grid Grid.Row="6">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="3*"/>
+					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="5*"/>
+				</Grid.ColumnDefinitions>
+				<Label Content="Preview attachment: " VerticalAlignment="Center" Grid.Column="0"/>
+				<Label x:Name="previewEmail" Content="" Grid.Column="1" VerticalAlignment="Center" />
+				<Label Content=" -&gt; " VerticalAlignment="Center" Grid.Column="2"/>
+				<Label x:Name="previewAttachment" Content="" Grid.Column="3" VerticalAlignment="Center" />
+			</Grid>
+			<Grid Grid.Row="7">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="3*"/>
+					<ColumnDefinition Width="Auto"/>
+					<ColumnDefinition Width="5*"/>
+				</Grid.ColumnDefinitions>
+				<Label Content="Preview replacement: " VerticalAlignment="Center" Grid.Column="0"/>
+				<Label x:Name="previewPlaceholder" Content="" Grid.Column="1" VerticalAlignment="Center" />
+				<Label Content=" -&gt; " VerticalAlignment="Center" Grid.Column="2"/>
+				<Label x:Name="previewReplace" Content="" Grid.Column="3" VerticalAlignment="Center" />
+			</Grid>
 		</Grid>
-		<Grid Grid.Row="5">
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="Auto"/>
-				<ColumnDefinition Width="3*"/>
-				<ColumnDefinition Width="Auto"/>
-				<ColumnDefinition Width="5*"/>
-			</Grid.ColumnDefinitions>
-			<Label Content="Preview attachment: " VerticalAlignment="Center" Grid.Column="0"/>
-			<Label x:Name="previewEmail" Content="" Grid.Column="1" VerticalAlignment="Center" />
-			<Label Content=" -&gt; " VerticalAlignment="Center" Grid.Column="2"/>
-			<Label x:Name="previewAttachment" Content="" Grid.Column="3" VerticalAlignment="Center" />
-		</Grid>
-		<Grid Grid.Row="6">
-			<Grid.ColumnDefinitions>
-				<ColumnDefinition Width="Auto"/>
-				<ColumnDefinition Width="3*"/>
-				<ColumnDefinition Width="Auto"/>
-				<ColumnDefinition Width="5*"/>
-			</Grid.ColumnDefinitions>
-			<Label Content="Preview replacement: " VerticalAlignment="Center" Grid.Column="0"/>
-			<Label x:Name="previewPlaceholder" Content="" Grid.Column="1" VerticalAlignment="Center" />
-			<Label Content=" -&gt; " VerticalAlignment="Center" Grid.Column="2"/>
-			<Label x:Name="previewReplace" Content="" Grid.Column="3" VerticalAlignment="Center" />
-		</Grid>
-		<Grid Grid.Row="7">
+		<Grid x:Name="buttons"  Grid.Row="1">
 			<Grid.ColumnDefinitions>
 				<ColumnDefinition Width="1*" />
 				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="1*" />
 				<ColumnDefinition Width="Auto" />
 				<ColumnDefinition Width="1*" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="1*" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="1*" />
+				<ColumnDefinition Width="Auto" />
+				<ColumnDefinition Width="1*" />
 			</Grid.ColumnDefinitions>
-			<Button Click="createDraftsButton_Click" x:Name="createDraftsButton" Content="Create drafts" Margin="0,10,0,0" Padding="5,1"  HorizontalAlignment="Center" Grid.Column="1"/>
-			<Button Click="sendDraftsButton_Click" x:Name="sendDraftsButton" Content="Send drafts" Margin="0,10,0,0" Padding="5,1" HorizontalAlignment="Center" Grid.Column="3"/>
+			<Button Click="processMergeButton_Click" x:Name="processMergeButton" Content="Process Merge" Margin="0,10,0,10" Padding="5,1"  HorizontalAlignment="Center" Grid.Column="1"/>
+			<Button Click="openMergeButton_Click" x:Name="openMergeButton" Content="Open Merge Folder" Margin="0,10,0,10" Padding="5,1"  HorizontalAlignment="Center" Grid.Column="3"/>
+			<Button Click="createDraftsButton_Click" x:Name="createDraftsButton" Content="Create drafts" Margin="0,10,0,10" Padding="5,1"  HorizontalAlignment="Center" Grid.Column="5"/>
+			<Button Click="sendDraftsButton_Click" x:Name="sendDraftsButton" Content="Send drafts" Margin="0,10,0,10" Padding="5,1" HorizontalAlignment="Center" Grid.Column="7"/>
+			<Button Click="cancelButton_Click" x:Name="cancelButton" Content="Cancel" Margin="0,10,0,10" Padding="5,1" HorizontalAlignment="Center" Grid.Column="9" IsEnabled="False"/>
 		</Grid>
 	</Grid>
 </Window>
