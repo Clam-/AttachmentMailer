@@ -690,6 +690,12 @@ namespace AttachmentMailer
 
 		private void addDocumentButton_Click(object sender, RoutedEventArgs e)
 		{
+			if (addDocLocationLabel.Content == null || addDocLocationLabel.Content.Equals(""))
+			{
+				statusLabel.Content = "Document missing. Click Browse to locate merge document.";
+				return;
+			}
+
 			if (!addDocName.Text.EndsWith(".pdf") && !addDocName.Text.EndsWith(".docx"))
 			{
 				statusLabel.Content = "Attachment name must end with .pdf or .docx";
