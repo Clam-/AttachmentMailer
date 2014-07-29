@@ -67,6 +67,7 @@ namespace AttachmentMailer
 
 		private void createDraftsButton_Click(object sender, RoutedEventArgs e)
 		{
+			Logger.log(TraceEventType.Verbose, 3, "Clicked create drafts.");
 			if (!checkApps())
 			{
 				return;
@@ -119,7 +120,7 @@ namespace AttachmentMailer
 
 		private void createDraftsWorker(object sender, DoWorkEventArgs e)
 		{
-
+			Logger.log(TraceEventType.Verbose, 3, "Starting Create Drafts worker...");
 			if (!checkApps())
 			{
 				return;
@@ -167,6 +168,7 @@ namespace AttachmentMailer
 			// Let's iterating
 			Boolean missingAttachment = false;
 			String missingAttachments = null;
+			int count = 0;
 			foreach (Excel.Range row in selection.Rows)
 			{
 				Outlook._MailItem newMI = orig.Copy();
@@ -241,6 +243,7 @@ namespace AttachmentMailer
 				newMI.Move(drafts);
 				Marshal.FinalReleaseComObject(newMI);
 				//newMI.Close(Outlook.OlInspectorClose.olSave);
+				count = count + 1;
 			}
 			Marshal.FinalReleaseComObject(selection);
 			Marshal.FinalReleaseComObject(drafts);
@@ -249,7 +252,7 @@ namespace AttachmentMailer
 			Marshal.FinalReleaseComObject(orig);
 			if (missingAttachment)
 			{
-				Logger.log(TraceEventType.Information, 1, "Missing: " + missingAttachments);
+				Logger.log(TraceEventType.Information, 9, "Missing: " + missingAttachments);
 				e.Result = "Done, but: " + missingAttachments;
 			}
 			else
@@ -257,6 +260,8 @@ namespace AttachmentMailer
 				e.Result = "Done.";
 			}
 			Logger.log(TraceEventType.Information, 1, "Create drafts worker done.");
+			Logger.log(TraceEventType.Information, 3, "Created " + count + " drafts, with " + docs.Count + " merged docs, " + 
+				ds.Count + " attachments and " + drs.Count + " replacements.");
 		}
 
 		private void workerDone(object sender, RunWorkerCompletedEventArgs e)
@@ -648,6 +653,7 @@ namespace AttachmentMailer
 
 		private void sendDraftsButton_Click(object sender, RoutedEventArgs e)
 		{
+			Logger.log(TraceEventType.Verbose, 3, "Clicked send drafts.");
 			if (!checkApps(false))
 			{
 				return;
@@ -666,10 +672,11 @@ namespace AttachmentMailer
 		private void sendDraftsWorker(object sender, DoWorkEventArgs e)
 		{
 			Outlook.MAPIFolder drafts = outNS.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderDrafts);
+			int count = 0;
 			try {
 				foreach (Outlook._MailItem mi in drafts.Items)
 				{
-					if (mi.To != null && !mi.To.Equals("")) { mi.Send(); }
+					if (mi.To != null && !mi.To.Equals("")) { mi.Send(); count = count + 1; }
 				}
 			} catch (COMException ex) {
 				Logger.log(TraceEventType.Critical, 9, "Outlook exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
@@ -678,6 +685,7 @@ namespace AttachmentMailer
 				Logger.log(TraceEventType.Critical, 9, "\r\nCRASH\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
 				throw new DataException("Other error. (" + ex.GetType() + "):" + ex.Message);
 			}
+			Logger.log(TraceEventType.Verbose, 3, "Done send drafts. Attempted to send " + count + " drafts.");
 		}
 
 		private void cancelButton_Click(object sender, RoutedEventArgs e)
@@ -718,6 +726,7 @@ namespace AttachmentMailer
 			}
 			((ObservableCollection<Document>)documentList.ItemsSource)
 					.Add(new Document((string)addDocLocationLabel.Content, addDocName.Text));
+			mergedocs.Clear();
 			statusLabel.Content = "Ready.";
 
 		}
@@ -793,6 +802,7 @@ namespace AttachmentMailer
 			{
 				((ObservableCollection<Document>)documentList.ItemsSource).Remove(d);
 			}
+			mergedocs.Clear();
 		}
 
 		private void Window_Closing(object sender, CancelEventArgs e)
