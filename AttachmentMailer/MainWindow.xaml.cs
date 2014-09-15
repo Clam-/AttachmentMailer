@@ -171,8 +171,15 @@ namespace AttachmentMailer
 			int count = 0;
 			foreach (Excel.Range row in selection.Rows)
 			{
-				Outlook._MailItem newMI = orig.Copy();
-				newMI.To = row.Cells[emailfield].Value2;
+				Outlook._MailItem newMI;
+				try
+				{
+					newMI = orig.Copy();
+				} catch (COMException ex) {
+					Logger.log(TraceEventType.Error, 9, "Outlook Exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
+					throw new DataException("Cannot open mail in \"Inline view.\" Either browse to a new folder/location in Outlook or disable \"Inline view.\"");
+				}
+				newMI.To = row.Cells[emailfield].Value2.ToString();
 				foreach (Attachment d in ds)
 				{
 					String fname = processAttachmentName(d.attachmentName, row);
@@ -200,7 +207,7 @@ namespace AttachmentMailer
 					StringBuilder sb = new StringBuilder();
 					for (int xi = 1; xi <= 10; xi++)
 					{
-						try { sb.Append((string)row.Cells[xi].Value2); }
+						try { sb.Append((string)row.Cells[xi].Value2.ToString()); }
 						catch (COMException) { continue; }
 					}
 					SHA1 sha = new SHA1CryptoServiceProvider();
@@ -220,15 +227,18 @@ namespace AttachmentMailer
 
 				if (drs.Count > 0)
 				{
-					// do body replacements
+					// do body (and Subject) replacements
 					try
 					{
 						string msg = newMI.HTMLBody;
+						string subject = newMI.Subject;
 						foreach (Replacement dr in drs)
 						{
-							msg = msg.Replace(dr.placeholder, row.Cells[dr.replacement].Value2);
+							msg = msg.Replace(dr.placeholder, row.Cells[dr.replacement].Value2.ToString());
+							subject = subject.Replace(dr.placeholder, row.Cells[dr.replacement].Value2.ToString());
 						}
 						newMI.HTMLBody = msg;
+						newMI.Subject = subject;
 					}
 					catch (COMException ex)
 					{
@@ -423,7 +433,7 @@ namespace AttachmentMailer
 					return null;
 				}
 				matched = true;
-				newaname = newaname.Replace(match.Value, row.Cells[index].Value2);
+				newaname = newaname.Replace(match.Value, row.Cells[index].Value2.ToString());
 			}
 			if (matched)
 			{
@@ -474,7 +484,7 @@ namespace AttachmentMailer
 			//selection = selection.CurrentRegion;
 			foreach (Excel.Range row in selection.Rows)
 			{
-				previewEmail.Content = row.Cells[emailindex].Value2;
+				previewEmail.Content = row.Cells[emailindex].Value2.ToString();
 				if (adata == null)
 				{
 					previewAttachment.Content = "";
@@ -491,7 +501,7 @@ namespace AttachmentMailer
 				else
 				{
 					previewPlaceholder.Content = rdata.placeholder;
-					previewReplace.Content = rdata.placeholder.Replace(rdata.placeholder, row.Cells[rdata.replacement].Value2);
+					previewReplace.Content = rdata.placeholder.Replace(rdata.placeholder, row.Cells[rdata.replacement].Value2.ToString());
 				}
 				
 				break;
