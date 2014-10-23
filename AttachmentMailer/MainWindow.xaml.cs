@@ -41,6 +41,7 @@ namespace AttachmentMailer
 	{
 
 		private static string MERGELOC = "merged";
+		private static int HASHFIELDNUMS = 15;
 		Excel.Application exApp;
 		Word.Application wordApp;
 
@@ -125,7 +126,6 @@ namespace AttachmentMailer
 			{
 				return;
 			}
-			
 			// check email field
 			int emailfield = -1;
 			Dispatcher.Invoke(new Action(() =>
@@ -142,7 +142,6 @@ namespace AttachmentMailer
 			{
 				throw new DataException("Bad selection.");
 			}
-
 			// get the draft
 			Outlook._MailItem orig;
 			if (folderMAPI != null && (folderMAPI.Items.Count > 0)) {
@@ -150,21 +149,17 @@ namespace AttachmentMailer
 			} else {
 				throw new DataException("Cannot find draft email.");
 			}
-
 			Outlook.MAPIFolder drafts = outNS.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderDrafts);
-
 			// unpack
 			object[] args = (object[]) e.Argument;
 			List<Attachment> ds = (List<Attachment>)args[0];
 			List<Replacement> drs = (List<Replacement>)args[1];
 			List<Document> docs = (List<Document>)args[2];
-
 			if ((docs.Count > 0) && (mergedocs.Count == 0))
 			{
 				// bail
 				throw new DataException("Error: Haven't processed merge it seems.");
 			}
-
 			// Let's iterating
 			Boolean missingAttachment = false;
 			String missingAttachments = null;
@@ -179,7 +174,7 @@ namespace AttachmentMailer
 					Logger.log(TraceEventType.Error, 9, "Outlook Exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
 					throw new DataException("Cannot open mail in \"Inline view.\" Either browse to a new folder/location in Outlook or disable \"Inline view.\"");
 				}
-				newMI.To = row.Cells[emailfield].Value2.ToString();
+				newMI.To = getCellContent(row.Cells[emailfield]);
 				foreach (Attachment d in ds)
 				{
 					String fname = processAttachmentName(d.attachmentName, row);
@@ -205,10 +200,11 @@ namespace AttachmentMailer
 				{
 					//generate hash
 					StringBuilder sb = new StringBuilder();
-					for (int xi = 1; xi <= 10; xi++)
+					for (int xi = 1; xi <= HASHFIELDNUMS; xi++)
 					{
-						try { sb.Append((string)row.Cells[xi].Value2.ToString()); }
+						try { sb.Append(getCellContent(row.Cells[xi])); }
 						catch (COMException) { continue; }
+						catch (Exception exc) { Logger.log(TraceEventType.Error, 9, exc.ToString() + "\n\rxi:" + xi + "\r\n"); continue; }
 					}
 					SHA1 sha = new SHA1CryptoServiceProvider();
 					string hash = BitConverter.ToString(sha.ComputeHash(
@@ -219,12 +215,11 @@ namespace AttachmentMailer
 					{
 						string nf = Path.Combine(tempMerge, fnames[1]);
 						File.Move(fnames[0], nf);
-						Logger.log(TraceEventType.Information, 1, "\r\nAttaching... " + nf);
+						Logger.log(TraceEventType.Verbose, 1, "\r\nAttaching... " + nf);
 						newMI.Attachments.Add(nf);
 						File.Move(nf, fnames[0]);
 					}
 				}
-
 				if (drs.Count > 0)
 				{
 					// do body (and Subject) replacements
@@ -234,8 +229,8 @@ namespace AttachmentMailer
 						string subject = newMI.Subject;
 						foreach (Replacement dr in drs)
 						{
-							msg = msg.Replace(dr.placeholder, row.Cells[dr.replacement].Value2.ToString());
-							subject = subject.Replace(dr.placeholder, row.Cells[dr.replacement].Value2.ToString());
+							msg = msg.Replace(dr.placeholder, getCellContent(row.Cells[dr.replacement]));
+							subject = subject.Replace(dr.placeholder, getCellContent(row.Cells[dr.replacement]));
 						}
 						newMI.HTMLBody = msg;
 						newMI.Subject = subject;
@@ -269,7 +264,7 @@ namespace AttachmentMailer
 			{
 				e.Result = "Done.";
 			}
-			Logger.log(TraceEventType.Information, 1, "Create drafts worker done.");
+			Logger.log(TraceEventType.Verbose, 1, "Create drafts worker done.");
 			Logger.log(TraceEventType.Information, 3, "Created " + count + " drafts, with " + docs.Count + " merged docs, " + 
 				ds.Count + " attachments and " + drs.Count + " replacements.");
 		}
@@ -433,7 +428,7 @@ namespace AttachmentMailer
 					return null;
 				}
 				matched = true;
-				newaname = newaname.Replace(match.Value, row.Cells[index].Value2.ToString());
+				newaname = newaname.Replace(match.Value, getCellContent(row.Cells[index]));
 			}
 			if (matched)
 			{
@@ -457,6 +452,17 @@ namespace AttachmentMailer
 			}
 		}
 
+		private string getCellContent(Excel.Range cell)
+		{
+			Object data = cell.Value2;
+			if (data != null)
+			{
+				return data.ToString();
+			}
+			//Logger.log(TraceEventType.Information, 99, "Cell ("+cell.Address+") contains null\r\n");
+			return "";
+		}
+
 		private void updateEmailButton_Click(object sender, RoutedEventArgs e)
 		{
 			if (!checkApps())
@@ -474,8 +480,18 @@ namespace AttachmentMailer
 			Attachment adata = (Attachment)getFirst(attachmentList.ItemsSource.GetEnumerator());
 
 			Replacement rdata = (Replacement)getFirst(replacementList.ItemsSource.GetEnumerator());
-			
-			Excel.Range selection = exApp.Selection;
+
+			Excel.Range selection;
+			try
+			{
+				selection = exApp.Selection;
+			}
+			catch (InvalidCastException ex)
+			{
+				statusLabel.Content = "Bad selection. Try re-opening Excel.";
+				Logger.log(TraceEventType.Error, 9, "Cast Exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
+				return;
+			}
 			if (selection == null)
 			{
 				statusLabel.Content = "Bad selection. Try re-opening Excel.";
@@ -484,7 +500,7 @@ namespace AttachmentMailer
 			//selection = selection.CurrentRegion;
 			foreach (Excel.Range row in selection.Rows)
 			{
-				previewEmail.Content = row.Cells[emailindex].Value2.ToString();
+				previewEmail.Content = getCellContent(row.Cells[emailindex]);
 				if (adata == null)
 				{
 					previewAttachment.Content = "";
@@ -501,7 +517,7 @@ namespace AttachmentMailer
 				else
 				{
 					previewPlaceholder.Content = rdata.placeholder;
-					previewReplace.Content = rdata.placeholder.Replace(rdata.placeholder, row.Cells[rdata.replacement].Value2.ToString());
+					previewReplace.Content = rdata.placeholder.Replace(rdata.placeholder, getCellContent(row.Cells[rdata.replacement]));
 				}
 				
 				break;
@@ -622,7 +638,7 @@ namespace AttachmentMailer
 			while (Directory.Exists(tempDirectory) || File.Exists(tempDirectory))
 			{ tempDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName()); }
 			Directory.CreateDirectory(tempDirectory);
-			Logger.log(TraceEventType.Verbose, 9, "Temp dir: " + tempDirectory);
+			Logger.log(TraceEventType.Information, 9, "Temp dir: " + tempDirectory);
 			tempMerge = Path.Combine(tempDirectory, MERGELOC);
 			statusLabel.Content = "Ready.";
 		}
@@ -880,7 +896,7 @@ namespace AttachmentMailer
 						doc.MailMerge.DataSource.LastRecord = i;
 						// hash field data
 						StringBuilder sb = new StringBuilder();
-						for (int xi = 1; xi <= 10; xi++)
+						for (int xi = 1; xi <= HASHFIELDNUMS; xi++)
 						{
 							try { sb.Append(doc.MailMerge.DataSource.DataFields[xi].Value); }
 							catch (COMException) { continue; }
