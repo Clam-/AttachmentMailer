@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Data;
+using System.Data.OleDb;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -102,10 +104,13 @@ namespace AttachmentMailer
 
 			if (worker != null && worker.WorkerSupportsCancellation) { worker.CancelAsync(); }
 			worker = new BackgroundWorker();
+			worker.WorkerSupportsCancellation = true;
+			worker.WorkerReportsProgress = true;
 			worker.DoWork +=
 				new DoWorkEventHandler(createDraftsWorker);
 			worker.RunWorkerCompleted +=
 				new RunWorkerCompletedEventHandler(workerDone);
+			worker.ProgressChanged += worker_ProgressChanged;
 			disableUI();
 			worker.RunWorkerAsync(arg);
 		}
@@ -121,6 +126,7 @@ namespace AttachmentMailer
 
 		private void createDraftsWorker(object sender, DoWorkEventArgs e)
 		{
+			BackgroundWorker worker = sender as BackgroundWorker;
 			Logger.log(TraceEventType.Verbose, 3, "Starting Create Drafts worker...");
 			if (!checkApps())
 			{
@@ -164,8 +170,10 @@ namespace AttachmentMailer
 			Boolean missingAttachment = false;
 			String missingAttachments = null;
 			int count = 0;
+			int max = selection.Rows.Count;
 			foreach (Excel.Range row in selection.Rows)
 			{
+				if ((worker.CancellationPending == true)) { e.Cancel = true; break; }
 				Outlook._MailItem newMI;
 				try
 				{
@@ -183,7 +191,7 @@ namespace AttachmentMailer
 					{
 						newMI.Attachments.Add(fname);
 					}
-					catch (System.IO.FileNotFoundException)
+					catch (FileNotFoundException)
 					{
 						if (!missingAttachment)
 						{
@@ -204,20 +212,50 @@ namespace AttachmentMailer
 					{
 						try { sb.Append(getCellContent(row.Cells[xi])); }
 						catch (COMException) { continue; }
-						catch (Exception exc) { Logger.log(TraceEventType.Error, 9, exc.ToString() + "\n\rxi:" + xi + "\r\n"); continue; }
+						catch (Exception exc) { Logger.log(TraceEventType.Error, 9, exc.ToString() + "\r\nxi:" + xi + "\r\n"); continue; }
 					}
 					SHA1 sha = new SHA1CryptoServiceProvider();
 					string hash = BitConverter.ToString(sha.ComputeHash(
 							Encoding.Unicode.GetBytes(sb.ToString())
 						)).Replace("-", string.Empty);
-					Logger.log(TraceEventType.Verbose, 1, "hash:" + hash + " hashed data: " + sb.ToString().Substring(0, 20));
-					foreach (string[] fnames in mergedocs[hash])
+					Logger.log(TraceEventType.Verbose, 1, "hash:" + hash + " hashed data: " + sb.ToString()); // .Substring(0, 20)
+					if (mergedocs.ContainsKey(hash))
 					{
-						string nf = Path.Combine(tempMerge, fnames[1]);
-						File.Move(fnames[0], nf);
-						Logger.log(TraceEventType.Verbose, 1, "\r\nAttaching... " + nf);
-						newMI.Attachments.Add(nf);
-						File.Move(nf, fnames[0]);
+						foreach (string[] fnames in mergedocs[hash])
+						{
+							string nf = Path.Combine(tempMerge, fnames[1]);
+							File.Move(fnames[0], nf);
+							Logger.log(TraceEventType.Verbose, 1, "\r\nAttaching... " + nf);
+							try
+							{
+								newMI.Attachments.Add(nf);
+							}
+							catch (FileNotFoundException)
+							{
+								if (!missingAttachment)
+								{
+									missingAttachments = "Attachments missing: (HASH)" + fnames[1];
+									missingAttachment = true;
+								}
+								else
+								{
+									missingAttachments = String.Concat(missingAttachments, "\n(HASH)" + fnames[1]);
+								}
+							}
+							File.Move(nf, fnames[0]);
+						}
+					}
+					else
+					{
+						if (!missingAttachment)
+						{
+							missingAttachments = "Attachments missing: (HASH)" + hash;
+							missingAttachment = true;
+						}
+						else
+						{
+							missingAttachments = String.Concat(missingAttachments, "\n(HASH)" + hash);
+						}
 					}
 				}
 				if (drs.Count > 0)
@@ -249,6 +287,7 @@ namespace AttachmentMailer
 				Marshal.FinalReleaseComObject(newMI);
 				//newMI.Close(Outlook.OlInspectorClose.olSave);
 				count = count + 1;
+				worker.ReportProgress((int)(((float)count / (float)max) * 100));
 			}
 			Marshal.FinalReleaseComObject(selection);
 			Marshal.FinalReleaseComObject(drafts);
@@ -533,8 +572,13 @@ namespace AttachmentMailer
 				return;
 			}
 			if (folderMAPI != null) { Marshal.FinalReleaseComObject(folderMAPI); }
-			folderMAPI = outNS.PickFolder();
 
+			statusLabel.Content = "Navigate to draft folder in outlook...";
+			//ghetto to make the label update
+			Application.Current.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background,
+									  new Action(delegate { }));
+			folderMAPI = outNS.PickFolder();
+			statusLabel.Content = "Ready.";
 			//OutlookFolderDialog ofd = new OutlookFolderDialog();
 			//if (ofd.ShowDialog() == true)
 			//{
@@ -548,6 +592,10 @@ namespace AttachmentMailer
 			if (folderMAPI != null)
 			{
 				this.draftFolder.Content = folderMAPI.FolderPath;
+			}
+			else
+			{
+				statusLabel.Content = "Invalid Outlook draft folder.";
 			}
 		}
 
@@ -687,22 +735,29 @@ namespace AttachmentMailer
 
 			if (worker != null && worker.WorkerSupportsCancellation) { worker.CancelAsync(); }
 			worker = new BackgroundWorker();
+			worker.WorkerSupportsCancellation = true;
+			worker.WorkerReportsProgress = true;
 			worker.DoWork +=
 				new DoWorkEventHandler(sendDraftsWorker);
 			worker.RunWorkerCompleted +=
 				new RunWorkerCompletedEventHandler(workerDone);
+			worker.ProgressChanged += worker_ProgressChanged;
 			disableUI();
 			worker.RunWorkerAsync();
 		}
 
 		private void sendDraftsWorker(object sender, DoWorkEventArgs e)
 		{
+			BackgroundWorker worker = sender as BackgroundWorker;
 			Outlook.MAPIFolder drafts = outNS.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderDrafts);
 			int count = 0;
+			int max = drafts.Items.Count;
 			try {
 				foreach (Outlook._MailItem mi in drafts.Items)
 				{
+					if ((worker.CancellationPending == true)) { e.Cancel = true; break; }
 					if (mi.To != null && !mi.To.Equals("")) { mi.Send(); count = count + 1; }
+					worker.ReportProgress((int)(((float)count / (float)max) * 100));
 				}
 			} catch (COMException ex) {
 				Logger.log(TraceEventType.Critical, 9, "Outlook exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
@@ -716,6 +771,7 @@ namespace AttachmentMailer
 
 		private void cancelButton_Click(object sender, RoutedEventArgs e)
 		{
+			Logger.log(TraceEventType.Verbose, 3, "Clicked Cancel.");
 			if (worker != null && worker.WorkerSupportsCancellation)
 			{
 				worker.CancelAsync();
@@ -857,21 +913,34 @@ namespace AttachmentMailer
 
 		private void processMergeButton_Click(object sender, RoutedEventArgs e)
 		{
+			Logger.log(TraceEventType.Verbose, 3, "Clicked process merge.");
 			// do worker stuff here
 			object arg = ((ObservableCollection<Document>)Resources["Docs"]).ToList();
 
 			if (worker != null && worker.WorkerSupportsCancellation) { worker.CancelAsync(); }
 			worker = new BackgroundWorker();
+			worker.WorkerSupportsCancellation = true;
+			worker.WorkerReportsProgress = true;
 			worker.DoWork +=
 				new DoWorkEventHandler(processMergeWorker);
 			worker.RunWorkerCompleted +=
 				new RunWorkerCompletedEventHandler(workerDone);
+			worker.ProgressChanged += worker_ProgressChanged;
 			disableUI();
 			worker.RunWorkerAsync(arg);
 		}
 
+		void worker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+		{
+			if (e.UserState != null) 
+				statusLabel.Content = e.UserState as String;
+			progress.Value = e.ProgressPercentage;
+			
+		}
+
 		private void processMergeWorker(object sender, DoWorkEventArgs e)
 		{
+			BackgroundWorker worker = sender as BackgroundWorker;
 			mergedocs.Clear();
 			try { Directory.Delete(tempMerge, true); }
 			catch (System.IO.DirectoryNotFoundException) { }
@@ -880,43 +949,74 @@ namespace AttachmentMailer
 			List<Document> docs = (List<Document>)e.Argument;
 			foreach (Document d in docs)
 			{
+				if ((worker.CancellationPending == true)) { e.Cancel = true; break; }
 				//process docs
+				worker.ReportProgress(0, "Press Yes in Word.");
 				Word._Document doc = wordApp.Application.Documents.Open(d.location, ReadOnly: true, Visible: false);
+				worker.ReportProgress(0, "Processing...");
 				if (doc.MailMerge.State == Word.WdMailMergeState.wdMainAndDataSource)
 				{
 					doc.MailMerge.Destination = Word.WdMailMergeDestination.wdSendToNewDocument;
 					doc.MailMerge.SuppressBlankLines = true;
+
 					doc.MailMerge.DataSource.ActiveRecord = Word.WdMailMergeActiveRecord.wdLastRecord;
+					
 					int maxRec = (int)doc.MailMerge.DataSource.ActiveRecord;
 					doc.MailMerge.DataSource.ActiveRecord = Word.WdMailMergeActiveRecord.wdFirstRecord;
-					for (int i = 1; i <= maxRec; i++ )
+					int index = (int)doc.MailMerge.DataSource.ActiveRecord;
+
+					OleDbConnection conn = new OleDbConnection(doc.MailMerge.DataSource.ConnectString.Replace("HDR=YES", "HDR=NO").Replace("HDR=Yes", "HDR=NO"));
+					OleDbCommand command = new OleDbCommand(doc.MailMerge.DataSource.QueryString, conn);
+					OleDbDataAdapter adapter = new OleDbDataAdapter(command);
+					try
 					{
-						Logger.log(TraceEventType.Verbose, 9, "Doc: " + d.location + " (rec: " + i + ")");
-						doc.MailMerge.DataSource.FirstRecord = i;
-						doc.MailMerge.DataSource.LastRecord = i;
+						conn.Open();
+					}
+					catch (InvalidOperationException olex)
+					{
+						doc.Close(SaveChanges: false);
+						throw olex;
+					}
+					DataSet data = new DataSet();
+					adapter.Fill(data, "datas");
+					conn.Close();
+					DataTable dt = data.Tables["datas"];
+					int prev = index;
+					bool done = false;
+					while (!done)
+					{
+						if ((worker.CancellationPending == true)) { e.Cancel = true; break; }
+						worker.ReportProgress((int)(((float)index / (float)maxRec) * 100));
+						Logger.log(TraceEventType.Verbose, 9, "Doc: " + d.location + " (rec: " + index + ")");
+						doc.MailMerge.DataSource.FirstRecord = index;
+						doc.MailMerge.DataSource.LastRecord = index;
+
+						DataRow olerow = dt.Rows[index];
 						// hash field data
 						StringBuilder sb = new StringBuilder();
 						for (int xi = 1; xi <= HASHFIELDNUMS; xi++)
 						{
-							try { sb.Append(doc.MailMerge.DataSource.DataFields[xi].Value); }
+							String oledata = olerow[xi - 1].ToString();
+							try { sb.Append(oledata); }
 							catch (COMException) { continue; }
 						}
 						SHA1 sha = new SHA1CryptoServiceProvider();
 						string hash = BitConverter.ToString(sha.ComputeHash(
 								Encoding.Unicode.GetBytes(sb.ToString())
 							)).Replace("-", string.Empty);
-						Logger.log(TraceEventType.Verbose, 1, "hash:" + hash + " hashed data: " + sb.ToString().Substring(0, 20));
+						Logger.log(TraceEventType.Verbose, 1, "hash:" + hash + " hashed data: " + sb.ToString()); //.Substring(0, 20)
 						string attachname = processDocAttachmentName(d.attachmentFormat, doc.MailMerge.DataSource.DataFields);
 						string docname = Path.Combine(tempMerge, hash + "-" + attachname);
 						if (!mergedocs.ContainsKey(hash))
 						{
 							mergedocs[hash] = new List<string[]>();
 						}
-						mergedocs[hash].Add(new string[] {docname, attachname});
+						mergedocs[hash].Add(new string[] { docname, attachname });
 
 						if (File.Exists(docname))
 						{
 							// bail and show error
+							Logger.log(TraceEventType.Verbose, 99, "Non unique: " + docname + "\r\n" + "hash:" + hash + " hashed data: " + sb.ToString()); 
 							doc.Close(SaveChanges: false);
 							mergedocs.Clear();
 							throw new DataException("IMPORTANT ERROR: Data source has non unique data.");
@@ -928,7 +1028,25 @@ namespace AttachmentMailer
 							ExportFormat: Word.WdExportFormat.wdExportFormatPDF);
 						nd.Close(SaveChanges: false);
 
-						doc.MailMerge.DataSource.ActiveRecord = Word.WdMailMergeActiveRecord.wdNextRecord;
+						int skips = 0;
+						do
+						{
+							try
+							{
+								doc.MailMerge.DataSource.ActiveRecord = Word.WdMailMergeActiveRecord.wdNextRecord;
+							}
+							catch (COMException)
+							{
+								done = true;
+								break;
+							}
+							index = (int)doc.MailMerge.DataSource.ActiveRecord;
+							// skip previous
+							Logger.log(TraceEventType.Verbose, 99, "Skipping (" + prev + "->" + index + ") skipped:" + skips);
+							skips = skips + 1;
+						} while (index == prev && skips < 10);
+						if (prev == index) break;
+						prev = index;
 					}
 				}
 				else
