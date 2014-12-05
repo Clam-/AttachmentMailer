@@ -210,7 +210,9 @@ namespace AttachmentMailer
 					StringBuilder sb = new StringBuilder();
 					for (int xi = 1; xi <= HASHFIELDNUMS; xi++)
 					{
-						try { sb.Append(getCellContent(row.Cells[xi])); }
+						try {
+							sb.Append(processFloat(getCellContent(row.Cells[xi])));
+						}
 						catch (COMException) { continue; }
 						catch (Exception exc) { Logger.log(TraceEventType.Error, 9, exc.ToString() + "\r\nxi:" + xi + "\r\n"); continue; }
 					}
@@ -965,7 +967,7 @@ namespace AttachmentMailer
 					doc.MailMerge.DataSource.ActiveRecord = Word.WdMailMergeActiveRecord.wdFirstRecord;
 					int index = (int)doc.MailMerge.DataSource.ActiveRecord;
 
-					OleDbConnection conn = new OleDbConnection(doc.MailMerge.DataSource.ConnectString.Replace("HDR=YES", "HDR=NO").Replace("HDR=Yes", "HDR=NO"));
+					OleDbConnection conn = new OleDbConnection(doc.MailMerge.DataSource.ConnectString.Replace("HDR=YES", "HDR=NO").Replace("HDR=Yes", "HDR=NO").Replace("HDR=yes", "HDR=NO"));
 					OleDbCommand command = new OleDbCommand(doc.MailMerge.DataSource.QueryString, conn);
 					OleDbDataAdapter adapter = new OleDbDataAdapter(command);
 					try
@@ -981,6 +983,20 @@ namespace AttachmentMailer
 					adapter.Fill(data, "datas");
 					conn.Close();
 					DataTable dt = data.Tables["datas"];
+
+					DataRow headrow = dt.Rows[0];
+					Dictionary<String, int> headers = new Dictionary<string, int>();
+					for (int x = 0; x < 100; x++ )
+					{
+						try
+						{
+							string col = headrow[x].ToString().Trim().ToLower();
+							if (col.Equals("")) { continue; }
+							headers.Add(col, x);
+						}
+						catch (IndexOutOfRangeException) { break; }
+					}
+
 					int prev = index;
 					bool done = false;
 					while (!done)
@@ -990,13 +1006,13 @@ namespace AttachmentMailer
 						Logger.log(TraceEventType.Verbose, 9, "Doc: " + d.location + " (rec: " + index + ")");
 						doc.MailMerge.DataSource.FirstRecord = index;
 						doc.MailMerge.DataSource.LastRecord = index;
-
+						
 						DataRow olerow = dt.Rows[index];
 						// hash field data
 						StringBuilder sb = new StringBuilder();
 						for (int xi = 1; xi <= HASHFIELDNUMS; xi++)
 						{
-							String oledata = olerow[xi - 1].ToString();
+							String oledata = processFloat(olerow[xi - 1].ToString());
 							try { sb.Append(oledata); }
 							catch (COMException) { continue; }
 						}
@@ -1005,7 +1021,7 @@ namespace AttachmentMailer
 								Encoding.Unicode.GetBytes(sb.ToString())
 							)).Replace("-", string.Empty);
 						Logger.log(TraceEventType.Verbose, 1, "hash:" + hash + " hashed data: " + sb.ToString()); //.Substring(0, 20)
-						string attachname = processDocAttachmentName(d.attachmentFormat, doc.MailMerge.DataSource.DataFields);
+						string attachname = processDocAttachmentName(d.attachmentFormat, olerow, headers);
 						string docname = Path.Combine(tempMerge, hash + "-" + attachname);
 						if (!mergedocs.ContainsKey(hash))
 						{
@@ -1064,6 +1080,11 @@ namespace AttachmentMailer
 			Process.Start(psi);
 		}
 
+		private void helpButton_Click_test(object sender, RoutedEventArgs e)
+		{
+			
+		}
+
 		private void Window_Closed(object sender, EventArgs e)
 		{
 			// clean up temp folder
@@ -1073,30 +1094,31 @@ namespace AttachmentMailer
 			}
 		}
 
-		private String processDocAttachmentName(String s, Word.MailMergeDataFields fields)
+		private String processDocAttachmentName(String s, DataRow row, Dictionary<String, int> headers)
 		{
 			String newaname = String.Copy(s);
-			string pattern = @"({[a-zA-Z ]+})";
+			string pattern = @"({[a-zA-Z _.,;:'""-]+})";
 			Boolean matched = false;
 			foreach (Match match in Regex.Matches(s, pattern))
 			{
-				string field = match.Value.Trim(new Char[] { '{', '}' });
+				string field = match.Value.Trim(new Char[] { '{', '}' }).ToLower();
 				if (field.Equals(""))
 				{
 					statusLabel.Content = "Invalid column name.";
 					return null;
 				}
 				matched = true;
-				newaname = newaname.Replace(match.Value, fields[field].Value);
+				if (headers.ContainsKey(field)) {
+					newaname = newaname.Replace(match.Value, row[headers[field]].ToString());
+				} else {
+					throw new DataException("Data source does not have header labelled (" + field + ")");
+				}
+
 			}
 			if (matched)
-			{
 				return newaname;
-			}
 			else
-			{
 				return s;
-			}
 		}
 
 		private void openMergeButton_Click(object sender, RoutedEventArgs e)
@@ -1110,6 +1132,18 @@ namespace AttachmentMailer
 			{
 				statusLabel.Content = "Merges not created yet.";
 			}
+		}
+
+		private String processFloat(String s)
+		{
+			string pattern = @"^[0-9]+\.[0-9]+$";
+			if (Regex.IsMatch(s, pattern))
+			{
+				// truncate float
+				Logger.log(TraceEventType.Verbose, 99, "ISFLOAT: " + s);
+				s = s.Substring(0, 11);
+			}
+			return s;
 		}
 
 	}
