@@ -992,7 +992,8 @@ namespace AttachmentMailer
 						{
 							string col = headrow[x].ToString().Trim().ToLower();
 							if (col.Equals("")) { continue; }
-							headers.Add(col, x);
+							try { headers.Add(col, x); }
+							catch (ArgumentException) { continue; }
 						}
 						catch (IndexOutOfRangeException) { break; }
 					}
@@ -1014,7 +1015,7 @@ namespace AttachmentMailer
 						{
 							String oledata = processFloat(olerow[xi - 1].ToString());
 							try { sb.Append(oledata); }
-							catch (COMException) { continue; }
+							catch (IndexOutOfRangeException) { continue; }
 						}
 						SHA1 sha = new SHA1CryptoServiceProvider();
 						string hash = BitConverter.ToString(sha.ComputeHash(
