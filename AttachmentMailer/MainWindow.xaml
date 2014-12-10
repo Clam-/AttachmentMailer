@@ -235,12 +235,15 @@
 					<ColumnDefinition Width="1*" />
 					<ColumnDefinition Width="Auto" />
 					<ColumnDefinition Width="1*" />
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="1*" />
 				</Grid.ColumnDefinitions>
 				<Button Click="processMergeButton_Click" x:Name="processMergeButton" Content="Process Merge" Margin="0,10,0,10" Padding="5,1"  HorizontalAlignment="Center" Grid.Column="1"/>
-				<Button Click="openMergeButton_Click" x:Name="openMergeButton" Content="Open Merge Folder" Margin="0,10,0,10" Padding="5,1"  HorizontalAlignment="Center" Grid.Column="3"/>
-				<Button Click="createDraftsButton_Click" x:Name="createDraftsButton" Content="Create drafts" Margin="0,10,0,10" Padding="5,1"  HorizontalAlignment="Center" Grid.Column="5"/>
-				<Button Click="sendDraftsButton_Click" x:Name="sendDraftsButton" Content="Send drafts" Margin="0,10,0,10" Padding="5,1" HorizontalAlignment="Center" Grid.Column="7"/>
-				<Button Click="cancelButton_Click" x:Name="cancelButton" Content="Cancel" Margin="0,10,0,10" Padding="5,1" HorizontalAlignment="Center" Grid.Column="9" IsEnabled="False"/>
+				<Button Click="processPublisherButton_Click"  x:Name="processPublisherButton" Content="Process Publisher" Margin="0,10,0,10" Padding="5,1"  HorizontalAlignment="Center" Grid.Column="3"/>
+				<Button Click="openMergeButton_Click" x:Name="openMergeButton" Content="Open Merge Folder" Margin="0,10,0,10" Padding="5,1"  HorizontalAlignment="Center" Grid.Column="5"/>
+				<Button Click="createDraftsButton_Click" x:Name="createDraftsButton" Content="Create drafts" Margin="0,10,0,10" Padding="5,1"  HorizontalAlignment="Center" Grid.Column="7"/>
+				<Button Click="sendDraftsButton_Click" x:Name="sendDraftsButton" Content="Send drafts" Margin="0,10,0,10" Padding="5,1" HorizontalAlignment="Center" Grid.Column="9"/>
+				<Button Click="cancelButton_Click" x:Name="cancelButton" Content="Cancel" Margin="0,10,0,10" Padding="5,1" HorizontalAlignment="Center" Grid.Column="11" IsEnabled="False"/>
 			</Grid>
 			<ProgressBar x:Name="progress" Height="20" VerticalAlignment="Center" Margin="10,0,10,10" />
 		</StackPanel>
