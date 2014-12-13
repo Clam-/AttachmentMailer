@@ -26,7 +26,7 @@
 					<ColumnDefinition Width="auto"/>
 				</Grid.ColumnDefinitions>
 				<Label x:Name="statusLabel" Content="Status" Grid.Row="0" Grid.Column="0"/>
-				<Button Click="helpButton_Click" x:Name="helpButton" Content="Show help..." Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" />
+				<Button Click="helpButton_Click" x:Name="helpButton" Content="Show help..." Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Padding="5,1" />
 			</Grid>
 			<GroupBox Header="Merged Documents" Grid.Row="1" Padding="5">
 				<Grid>
@@ -52,7 +52,7 @@
 								<Button Click="addDocFileButton_Click"  x:Name="addDocFileButton" Content="Browse..." VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="2" Padding="5,1"/>
 								<Label Content="Attachment name:" Grid.Column="3" VerticalAlignment="Center" />
 								<TextBox x:Name="addDocName" TextWrapping="Wrap" VerticalAlignment="Center" Grid.Column="4"/>
-								<Button Click="addDocumentButton_Click" x:Name="addDocumentButton" Content="Add" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Grid.Column="6" Padding="5,1"/>
+								<Button Click="addDocumentButton_Click" x:Name="addDocumentButton" Content="Add" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="10,0" Padding="5,1" Grid.Column="6" />
 							</Grid>
 						</StackPanel>
 					</GroupBox>
@@ -214,11 +214,13 @@
 					<ColumnDefinition Width="3*"/>
 					<ColumnDefinition Width="Auto"/>
 					<ColumnDefinition Width="5*"/>
+					<ColumnDefinition Width="Auto"/>
 				</Grid.ColumnDefinitions>
 				<Label Content="Preview replacement: " VerticalAlignment="Center" Grid.Column="0"/>
 				<Label x:Name="previewPlaceholder" Content="" Grid.Column="1" VerticalAlignment="Center" />
 				<Label Content=" -&gt; " VerticalAlignment="Center" Grid.Column="2"/>
 				<Label x:Name="previewReplace" Content="" Grid.Column="3" VerticalAlignment="Center" />
+				<Button Click="advancedButton_Click" x:Name="advancedButton" Content="Advanced..." Margin="0,10,0,10" Padding="5,1"  HorizontalAlignment="Center" Grid.Column="5"/>
 			</Grid>
 		</Grid>
 		<StackPanel Grid.Row="1">

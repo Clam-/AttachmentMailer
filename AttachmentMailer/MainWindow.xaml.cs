@@ -179,20 +179,63 @@ namespace AttachmentMailer
 			String missingAttachments = null;
 			int count = 0;
 			int max = selection.Rows.Count;
+			Dictionary<String, Outlook._MailItem> mailitems = new Dictionary<string,Outlook._MailItem>();
+
 			foreach (Excel.Range row in selection.Rows)
 			{
+				String hash = "";
+				
+				//generate hash
+				StringBuilder sb = new StringBuilder();
+
+				int[] ia = Option.getColumns();
+				if (ia != null)
+				{
+					foreach (int xi in ia)
+					{
+						try { sb.Append(processFloat(getCellContent(row.Cells[xi]))); }
+						catch (COMException) { continue; }
+						catch (Exception exc) { Logger.log(TraceEventType.Error, 9, exc.ToString() + "\r\nxi:" + xi + "\r\n"); continue; }
+					}
+				}
+				else
+				{
+					for (int xi = 1; xi <= HASHFIELDNUMS; xi++)
+					{
+						try { sb.Append(processFloat(getCellContent(row.Cells[xi]))); }
+						catch (COMException) { continue; }
+						catch (Exception exc) { Logger.log(TraceEventType.Error, 9, exc.ToString() + "\r\nxi:" + xi + "\r\n"); continue; }
+					}
+				}
+
+				SHA1 sha = new SHA1CryptoServiceProvider();
+				hash = BitConverter.ToString(sha.ComputeHash(
+						Encoding.Unicode.GetBytes(sb.ToString())
+					)).Replace("-", string.Empty);
+				Logger.log(TraceEventType.Verbose, 1, "hash:" + hash + " hashed data: " + sb.ToString()); // .Substring(0, 20)
+				
 				if ((worker.CancellationPending == true)) { e.Cancel = true; break; }
 				Outlook._MailItem newMI;
-				try
+				bool newItem = true;
+				if (!Option.createforuniquehash || (Option.createforuniquehash && !mailitems.ContainsKey(hash)))
 				{
-					newMI = orig.Copy();
+					Logger.log(TraceEventType.Verbose, 999, "Making new mail for:" + hash);
+					try
+					{
+						newMI = orig.Copy();
+						if (Option.createforuniquehash) { mailitems[hash] = newMI; }
+					}
+					catch (COMException ex)
+					{
+						Logger.log(TraceEventType.Error, 9, "Outlook Exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
+						throw new DataException("Cannot open mail in \"Inline view.\" Either browse to a new folder/location in Outlook or disable \"Inline view.\"");
+					}
 				}
-				catch (COMException ex)
-				{
-					Logger.log(TraceEventType.Error, 9, "Outlook Exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
-					throw new DataException("Cannot open mail in \"Inline view.\" Either browse to a new folder/location in Outlook or disable \"Inline view.\"");
-				}
-				newMI.To = getCellContent(row.Cells[emailfield]);
+				else { newMI = mailitems[hash]; newItem = false; }
+
+				string email = getCellContent(row.Cells[emailfield]);
+				if (!email.Equals("")){ newMI.To = email; }
+				// add existing items
 				foreach (Attachment d in ds)
 				{
 					String fname = processAttachmentName(d.attachmentName, row);
@@ -214,24 +257,9 @@ namespace AttachmentMailer
 						}
 					}
 				}
-				if (docs.Count > 0)
+				// add merge items. only if newitem:
+				if (newItem)
 				{
-					//generate hash
-					StringBuilder sb = new StringBuilder();
-					for (int xi = 1; xi <= HASHFIELDNUMS; xi++)
-					{
-						try
-						{
-							sb.Append(processFloat(getCellContent(row.Cells[xi])));
-						}
-						catch (COMException) { continue; }
-						catch (Exception exc) { Logger.log(TraceEventType.Error, 9, exc.ToString() + "\r\nxi:" + xi + "\r\n"); continue; }
-					}
-					SHA1 sha = new SHA1CryptoServiceProvider();
-					string hash = BitConverter.ToString(sha.ComputeHash(
-							Encoding.Unicode.GetBytes(sb.ToString())
-						)).Replace("-", string.Empty);
-					Logger.log(TraceEventType.Verbose, 1, "hash:" + hash + " hashed data: " + sb.ToString()); // .Substring(0, 20)
 					if (mergedocs.ContainsKey(hash))
 					{
 						foreach (string[] fnames in mergedocs[hash])
@@ -271,9 +299,9 @@ namespace AttachmentMailer
 						}
 					}
 				}
-				if (drs.Count > 0)
+				if (drs.Count > 0 && newItem)
 				{
-					// do body (and Subject) replacements
+					// do body (and Subject) replacements only if newitem
 					try
 					{
 						string msg = newMI.HTMLBody;
@@ -290,18 +318,21 @@ namespace AttachmentMailer
 					{
 						newMI.Close(Outlook.OlInspectorClose.olDiscard);
 						Marshal.FinalReleaseComObject(newMI);
+						if (Option.createforuniquehash) { cleanUpDraftDict(mailitems); }
 						Marshal.FinalReleaseComObject(selection);
 						Marshal.FinalReleaseComObject(drafts);
 						Logger.log(TraceEventType.Error, 9, "Outlook Exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
 						throw new DataException("Access denied. You need to change Outlook settings.");
 					}
 				}
-				newMI.Move(drafts);
-				Marshal.FinalReleaseComObject(newMI);
+				if (newItem) { newMI.Move(drafts); }
+				if (!Option.createforuniquehash) { Marshal.FinalReleaseComObject(newMI); }
 				//newMI.Close(Outlook.OlInspectorClose.olSave);
 				count = count + 1;
 				worker.ReportProgress((int)(((float)count / (float)max) * 100));
 			}
+			// clean up dictionary of mailitems
+			if (Option.createforuniquehash) { cleanUpDraftDict(mailitems); }
 			Marshal.FinalReleaseComObject(selection);
 			Marshal.FinalReleaseComObject(drafts);
 
@@ -319,6 +350,18 @@ namespace AttachmentMailer
 			Logger.log(TraceEventType.Verbose, 1, "Create drafts worker done.");
 			Logger.log(TraceEventType.Information, 3, "Created " + count + " drafts, with " + docs.Count + " merged docs, " +
 				ds.Count + " attachments and " + drs.Count + " replacements.");
+		}
+
+		private void cleanUpDraftDict(Dictionary<String, Outlook._MailItem> items)
+		{
+			// clean up dictionary of mailitem
+			List<String> keys = items.Keys.ToList();
+			foreach (String key in keys)
+			{
+				Outlook._MailItem mi = items[key];
+				items.Remove(key);
+				Marshal.FinalReleaseComObject(mi);
+			}
 		}
 
 		private void workerDone(object sender, RunWorkerCompletedEventArgs e)
@@ -853,7 +896,7 @@ namespace AttachmentMailer
 			}
 			((ObservableCollection<Document>)documentList.ItemsSource)
 					.Add(new Document((string)addDocLocationLabel.Content, addDocName.Text));
-			mergedocs.Clear();
+			nukeTempMerges();
 			statusLabel.Content = "Ready.";
 
 		}
@@ -929,7 +972,7 @@ namespace AttachmentMailer
 			{
 				((ObservableCollection<Document>)documentList.ItemsSource).Remove(d);
 			}
-			mergedocs.Clear();
+			nukeTempMerges();
 		}
 
 		private void Window_Closing(object sender, CancelEventArgs e)
@@ -988,13 +1031,32 @@ namespace AttachmentMailer
 
 		}
 
-		private void processMergeWorker(object sender, DoWorkEventArgs e)
+		private void nukeTempMerges()
 		{
-			BackgroundWorker worker = sender as BackgroundWorker;
 			mergedocs.Clear();
 			try { Directory.Delete(tempMerge, true); }
 			catch (System.IO.DirectoryNotFoundException) { }
 			Directory.CreateDirectory(tempMerge);
+		}
+
+		private void printMergeDict()
+		{
+			Logger.log(TraceEventType.Verbose, 999, "MERGE DICT:");
+			StringBuilder sb = new StringBuilder();
+			foreach (String key in mergedocs.Keys)
+			{
+				foreach (string[] fnames in mergedocs[key])
+				{
+					sb.Append(key + ":" + fnames[0] + "-" + fnames[1]+"\n");
+				}
+			}
+			Logger.log(TraceEventType.Verbose, 999, sb.ToString());
+		}
+
+		private void processMergeWorker(object sender, DoWorkEventArgs e)
+		{
+			BackgroundWorker worker = sender as BackgroundWorker;
+			nukeTempMerges();
 
 			List<Document> docs = (List<Document>)e.Argument;
 			foreach (Document d in docs)
@@ -1061,11 +1123,22 @@ namespace AttachmentMailer
 						DataRow olerow = dt.Rows[index];
 						// hash field data
 						StringBuilder sb = new StringBuilder();
-						for (int xi = 1; xi <= HASHFIELDNUMS; xi++)
+						int[] ia = Option.getColumns();
+						if (ia != null)
 						{
-							String oledata = processFloat(olerow[xi - 1].ToString());
-							try { sb.Append(oledata); }
-							catch (IndexOutOfRangeException) { continue; }
+							foreach (int xi in ia)
+							{
+								try { sb.Append(processFloat(olerow[xi - 1].ToString())); }
+								catch (IndexOutOfRangeException) { continue; }
+							}
+						}
+						else
+						{
+							for (int xi = 1; xi <= HASHFIELDNUMS; xi++)
+							{
+								try { sb.Append(processFloat(olerow[xi - 1].ToString())); }
+								catch (IndexOutOfRangeException) { continue; }
+							}
 						}
 						SHA1 sha = new SHA1CryptoServiceProvider();
 						string hash = BitConverter.ToString(sha.ComputeHash(
@@ -1078,30 +1151,30 @@ namespace AttachmentMailer
 						{
 							mergedocs[hash] = new List<string[]>();
 						}
-						mergedocs[hash].Add(new string[] { docname, attachname });
 
-						if (File.Exists(docname))
+						if (File.Exists(docname) && !Option.allowduplicatehash)
 						{
 							// bail and show error
 							Logger.log(TraceEventType.Verbose, 99, "Non unique: " + docname + "\r\n" + "hash:" + hash + " hashed data: " + sb.ToString());
 							doc.Close(SaveChanges: false);
-							mergedocs.Clear();
+							nukeTempMerges();
 							throw new DataException("IMPORTANT ERROR: Data source has non unique data.");
 						}
-						d.attachmentName = docname;
-						doc.MailMerge.Execute(Pause: false);
-						Word._Document nd = wordApp.ActiveDocument;
-						nd.ExportAsFixedFormat(OutputFileName: docname,
-							ExportFormat: Word.WdExportFormat.wdExportFormatPDF);
-						nd.Close(SaveChanges: false);
+						else if (!File.Exists(docname))
+						{
+							//d.attachmentName = docname;
+							doc.MailMerge.Execute(Pause: false);
+							Word._Document nd = wordApp.ActiveDocument;
+							nd.ExportAsFixedFormat(OutputFileName: docname,
+								ExportFormat: Word.WdExportFormat.wdExportFormatPDF);
+							nd.Close(SaveChanges: false);
+							mergedocs[hash].Add(new string[] { docname, attachname });
+						}
 
 						int skips = 0;
 						do
 						{
-							try
-							{
-								doc.MailMerge.DataSource.ActiveRecord = Word.WdMailMergeActiveRecord.wdNextRecord;
-							}
+							try { doc.MailMerge.DataSource.ActiveRecord = Word.WdMailMergeActiveRecord.wdNextRecord; }
 							catch (COMException)
 							{
 								done = true;
@@ -1183,10 +1256,7 @@ namespace AttachmentMailer
 				ProcessStartInfo psi = new ProcessStartInfo(tempMerge);
 				Process.Start(psi);
 			}
-			else
-			{
-				statusLabel.Content = "Merges not created yet.";
-			}
+			else { statusLabel.Content = "Merges not created yet."; }
 		}
 
 		private String processFloat(String s)
@@ -1237,11 +1307,11 @@ namespace AttachmentMailer
 			//process docs
 
 			worker.ReportProgress(0, "Processing...");
-
 			doc.MailMerge.SuppressBlankLines = false;
 
 			int maxRec = (int)doc.MailMerge.DataSource.RecordCount;
 			//doc.MailMerge.DataSource.ActiveRecord = doc.MailMerge.DataSource.FirstRecord;
+			int origactive = (int)doc.MailMerge.DataSource.ActiveRecord;
 			int index = (int)doc.MailMerge.DataSource.ActiveRecord;
 
 			int pages = doc.Pages.Count;
@@ -1252,14 +1322,10 @@ namespace AttachmentMailer
 				Replace("HDR=Yes", "HDR=NO").Replace("HDR=yes", "HDR=NO"));
 			OleDbCommand command = new OleDbCommand("SELECT * FROM [" + doc.MailMerge.DataSource.TableName + "]", conn);
 			OleDbDataAdapter adapter = new OleDbDataAdapter(command);
-			try
-			{
-				conn.Open();
-			}
-			catch (InvalidOperationException olex)
-			{
-				throw olex;
-			}
+			
+			conn.Open();
+			//catch (InvalidOperationException olex) { throw olex; }
+
 			DataSet data = new DataSet();
 			adapter.Fill(data, "datas");
 			conn.Close();
@@ -1283,27 +1349,33 @@ namespace AttachmentMailer
 			Logger.log(TraceEventType.Information, 5, "START: " + (int)t.TotalSeconds);
 
 			Publisher._Document nd = doc.MailMerge.Execute(Pause: false, Destination: Publisher.PbMailMergeDestination.pbMergeToNewPublication);
-
+			doc.MailMerge.DataSource.ActiveRecord = origactive;
 			while (index <= maxRec)
 			{
 				if ((worker.CancellationPending == true)) { e.Cancel = true; break; }
 				worker.ReportProgress((int)(((float)index / (float)maxRec) * 100));
 				Logger.log(TraceEventType.Verbose, 9, "PUB - " + " (rec: " + index + ")");
 
-				
-
 				try { olerow = dt.Rows[index]; }
 				catch (IndexOutOfRangeException) { break; }
 				// hash field data
 				StringBuilder sb = new StringBuilder();
-				for (int xi = 1; xi <= HASHFIELDNUMS; xi++)
+				int[] ia = Option.getColumns();
+				if (ia != null)
 				{
-					try
+					foreach (int xi in ia)
 					{
-						String oledata = processFloat(olerow[xi - 1].ToString());
-						sb.Append(oledata);
+						try { sb.Append(processFloat(olerow[xi - 1].ToString())); }
+						catch (IndexOutOfRangeException) { continue; }
 					}
-					catch (IndexOutOfRangeException) { continue; }
+				}
+				else
+				{
+					for (int xi = 1; xi <= HASHFIELDNUMS; xi++)
+					{
+						try { sb.Append(processFloat(olerow[xi - 1].ToString())); }
+						catch (IndexOutOfRangeException) { continue; }
+					}
 				}
 				SHA1 sha = new SHA1CryptoServiceProvider();
 				string hash = BitConverter.ToString(sha.ComputeHash(
@@ -1316,26 +1388,36 @@ namespace AttachmentMailer
 				{
 					mergedocs[hash] = new List<string[]>();
 				}
-				mergedocs[hash].Add(new string[] { docname, attachname });
 
-				if (File.Exists(docname))
+				if (File.Exists(docname) && !Option.allowduplicatehash)
 				{
 					// bail and show error
 					Logger.log(TraceEventType.Verbose, 99, "Non unique: " + docname + "\r\n" + "hash:" + hash + " hashed data: " + sb.ToString());
-					mergedocs.Clear();
-					throw new DataException("IMPORTANT ERROR: Data source has non unique data.");
+					nukeTempMerges();
+					throw new DataException("IMPORTANT ERROR: Data source has non unique data. Or same attachment name.");
 				}
-				Logger.log(TraceEventType.Verbose, 90, "Saving to: " + docname);
+				else if (!File.Exists(docname))
+				{
+					Logger.log(TraceEventType.Verbose, 90, "Saving to: " + docname);
 
-				startpage = index * pages;
-				endpage = startpage + pages - 1;
-				nd.ExportAsFixedFormat(Publisher.PbFixedFormatType.pbFixedFormatTypePDF, docname, From: startpage, To: endpage);
+					startpage = index * pages;
+					endpage = startpage + pages - 1;
+					nd.ExportAsFixedFormat(Publisher.PbFixedFormatType.pbFixedFormatTypePDF, docname, From: startpage, To: endpage);
+					mergedocs[hash].Add(new string[] { docname, attachname });
+				}
 				index = index + 1;
 				Logger.log(TraceEventType.Verbose, 99, "Trying: " + index);
 			}
 			nd.Close();
 			t = (DateTime.UtcNow - new DateTime(1970, 1, 1));
 			Logger.log(TraceEventType.Information, 5, "END: " + (int)t.TotalSeconds);
+		}
+
+		private void advancedButton_Click(object sender, RoutedEventArgs e)
+		{
+			var options = new Advanced();
+			options.Owner = this;
+			options.ShowDialog();
 		}
 
 	}
