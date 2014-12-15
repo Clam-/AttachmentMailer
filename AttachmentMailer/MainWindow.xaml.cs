@@ -230,16 +230,26 @@ namespace AttachmentMailer
 						Logger.log(TraceEventType.Error, 9, "Outlook Exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
 						throw new DataException("Cannot open mail in \"Inline view.\" Either browse to a new folder/location in Outlook or disable \"Inline view.\"");
 					}
+					Logger.log(TraceEventType.Verbose, 1, "Mail item:" + newMI + "||" + newMI.EntryID);
 				}
-				else { newMI = mailitems[hash]; newItem = false; }
-
+				else {
+					newMI = mailitems[hash]; newItem = false;
+					Logger.log(TraceEventType.Verbose, 1, "\r\nGETTING MAIL ITEM FOR HASH: " + hash +
+						"\r\nMail item:" + newMI + "||" + newMI.EntryID);
+				}
+				
 				string email = getCellContent(row.Cells[emailfield]);
+				if (!newItem)
+					Logger.log(TraceEventType.Verbose, 1, "\r\nUpdating email ... " + email);
 				if (!email.Equals("")){ newMI.To = email; }
 				// add existing items
+				if (!newItem) { Logger.log(TraceEventType.Verbose, 1, "\r\nDoing attachments for existing mail...");  }
+				else { Logger.log(TraceEventType.Verbose, 1, "\r\nDoing attachments for new mail..."); }
 				foreach (Attachment d in ds)
 				{
 					String fname = processAttachmentName(d.attachmentName, row);
 					fname = System.IO.Path.Combine(d.location, fname);
+					Logger.log(TraceEventType.Verbose, 1, "\r\nAttaching... " + fname);
 					try
 					{
 						newMI.Attachments.Add(fname);
@@ -318,21 +328,25 @@ namespace AttachmentMailer
 					{
 						newMI.Close(Outlook.OlInspectorClose.olDiscard);
 						Marshal.FinalReleaseComObject(newMI);
-						if (Option.createforuniquehash) { cleanUpDraftDict(mailitems); }
+						if (Option.createforuniquehash) { cleanUpDraftDict(mailitems, null); }
 						Marshal.FinalReleaseComObject(selection);
 						Marshal.FinalReleaseComObject(drafts);
 						Logger.log(TraceEventType.Error, 9, "Outlook Exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
 						throw new DataException("Access denied. You need to change Outlook settings.");
 					}
 				}
-				if (newItem) { newMI.Move(drafts); }
-				if (!Option.createforuniquehash) { Marshal.FinalReleaseComObject(newMI); }
+				if (!Option.createforuniquehash) 
+				{
+					newMI.Move(drafts);
+					Marshal.FinalReleaseComObject(newMI); 
+				}
 				//newMI.Close(Outlook.OlInspectorClose.olSave);
+				//newMI.Save();
 				count = count + 1;
 				worker.ReportProgress((int)(((float)count / (float)max) * 100));
 			}
 			// clean up dictionary of mailitems
-			if (Option.createforuniquehash) { cleanUpDraftDict(mailitems); }
+			if (Option.createforuniquehash) { cleanUpDraftDict(mailitems, drafts); }
 			Marshal.FinalReleaseComObject(selection);
 			Marshal.FinalReleaseComObject(drafts);
 
@@ -352,13 +366,16 @@ namespace AttachmentMailer
 				ds.Count + " attachments and " + drs.Count + " replacements.");
 		}
 
-		private void cleanUpDraftDict(Dictionary<String, Outlook._MailItem> items)
+		private void cleanUpDraftDict(Dictionary<String, Outlook._MailItem> items, Outlook.MAPIFolder drafts)
 		{
 			// clean up dictionary of mailitem
+			Logger.log(TraceEventType.Verbose, 1, "\r\nCleaning up unique mail dict");
 			List<String> keys = items.Keys.ToList();
 			foreach (String key in keys)
 			{
 				Outlook._MailItem mi = items[key];
+				if (drafts != null) { mi.Move(drafts); }
+				else { mi.Close(Outlook.OlInspectorClose.olDiscard); }
 				items.Remove(key);
 				Marshal.FinalReleaseComObject(mi);
 			}
