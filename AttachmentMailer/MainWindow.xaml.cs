@@ -88,14 +88,14 @@ namespace AttachmentMailer
 			Excel.Range selection = exApp.Selection;
 			if (selection == null)
 			{
-				statusLabel.Content = "Bad selection.";
+				statusLabel.Text = "Bad selection.";
 				return;
 			}
 
 			// check for a draft
 			if (folderMAPI != null && (folderMAPI.Items.Count < 1))
 			{
-				statusLabel.Content = "Cannot find draft email.";
+				statusLabel.Text = "Cannot find draft email.";
 				return;
 			}
 
@@ -319,7 +319,18 @@ namespace AttachmentMailer
 						foreach (Replacement dr in drs)
 						{
 							msg = msg.Replace(dr.placeholder, getCellContent(row.Cells[dr.replacement]));
-							subject = subject.Replace(dr.placeholder, getCellContent(row.Cells[dr.replacement]));
+                            try
+                            {
+                                subject = subject.Replace(dr.placeholder, getCellContent(row.Cells[dr.replacement]));
+                            } catch (NullReferenceException eex)
+                            {
+                                newMI.Close(Outlook.OlInspectorClose.olDiscard);
+                                Marshal.FinalReleaseComObject(newMI);
+                                if (Option.createforuniquehash) { cleanUpDraftDict(mailitems, null); }
+                                Marshal.FinalReleaseComObject(selection);
+                                Marshal.FinalReleaseComObject(drafts);
+                                throw new DataException("Missing Subject from Draft");
+                            }
 						}
 						newMI.HTMLBody = msg;
 						newMI.Subject = subject;
@@ -386,7 +397,7 @@ namespace AttachmentMailer
 			// First, handle the case where an exception was thrown. 
 			if (e.Error != null)
 			{
-				statusLabel.Content = e.Error.Message;
+				statusLabel.Text = e.Error.Message;
 				Logger.log(TraceEventType.Error, 9, "Worker Exception\r\n" + e.Error.GetType() + ":" + e.Error.Message + "\r\n" + e.Error.StackTrace);
 			}
 			else if (e.Cancelled)
@@ -397,14 +408,14 @@ namespace AttachmentMailer
 				// the DoWork event handler, the Cancelled 
 				// flag may not have been set, even though 
 				// CancelAsync was called.
-				statusLabel.Content = "Operation canceled";
+				statusLabel.Text = "Operation canceled";
 			}
 			else
 			{
 				// Finally, handle the case where the operation  
 				// succeeded.
-				if (e.Result != null) { statusLabel.Content = e.Result.ToString(); }
-				else { statusLabel.Content = "Done."; }
+				if (e.Result != null) { statusLabel.Text = e.Result.ToString(); }
+				else { statusLabel.Text = "Done."; }
 			}
 
 			//set buttons
@@ -420,11 +431,11 @@ namespace AttachmentMailer
 		{
 			if (addAttachFolderLabel.Content.Equals(""))
 			{
-				statusLabel.Content = "Invalid folder.";
+				statusLabel.Text = "Invalid folder.";
 			}
 			else if (addAttachFolderLabel.Content.Equals("-1"))
 			{
-				statusLabel.Content = "Invalid folder.";
+				statusLabel.Text = "Invalid folder.";
 			}
 			else
 			{
@@ -474,12 +485,12 @@ namespace AttachmentMailer
 			int emailindex = parseNumber(emailColumn.Text);
 			if (emailindex == -2)
 			{
-				statusLabel.Content = "Invalid column number for email address. Must be greater than 0.";
+				statusLabel.Text = "Invalid column number for email address. Must be greater than 0.";
 				return -1;
 			}
 			else if (emailindex == -1)
 			{
-				statusLabel.Content = "Invalid column number for email address.";
+				statusLabel.Text = "Invalid column number for email address.";
 				return -1;
 			}
 			return emailindex;
@@ -502,12 +513,12 @@ namespace AttachmentMailer
 			int replaceindex = parseNumber(replaceWithCol.Text);
 			if (replaceindex == -2)
 			{
-				statusLabel.Content = "Invalid column number for replacement. Must be greater than 0.";
+				statusLabel.Text = "Invalid column number for replacement. Must be greater than 0.";
 				return -1;
 			}
 			else if (replaceindex == -1)
 			{
-				statusLabel.Content = "Invalid column number for replacement.";
+				statusLabel.Text = "Invalid column number for replacement.";
 				return -1;
 			}
 			return replaceindex;
@@ -539,7 +550,7 @@ namespace AttachmentMailer
 				int index = Convert.ToInt32(match.Value.Trim(new Char[] { '{', '}' }));
 				if (index <= 0)
 				{
-					statusLabel.Content = "Invalid column number.";
+					statusLabel.Text = "Invalid column number.";
 					return null;
 				}
 				matched = true;
@@ -603,13 +614,13 @@ namespace AttachmentMailer
 			}
 			catch (InvalidCastException ex)
 			{
-				statusLabel.Content = "Bad selection. Try re-opening Excel.";
+				statusLabel.Text = "Bad selection. Try re-opening Excel.";
 				Logger.log(TraceEventType.Error, 9, "Cast Exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
 				return;
 			}
 			if (selection == null)
 			{
-				statusLabel.Content = "Bad selection. Try re-opening Excel.";
+				statusLabel.Text = "Bad selection. Try re-opening Excel.";
 				return;
 			}
 			//selection = selection.CurrentRegion;
@@ -638,7 +649,7 @@ namespace AttachmentMailer
 				break;
 			}
 			Marshal.FinalReleaseComObject(selection);
-			statusLabel.Content = "Ready.";
+			statusLabel.Text = "Ready.";
 		}
 
 		private void draftFolderbutton_Click(object sender, RoutedEventArgs e)
@@ -649,12 +660,12 @@ namespace AttachmentMailer
 			}
 			if (folderMAPI != null) { Marshal.FinalReleaseComObject(folderMAPI); }
 
-			statusLabel.Content = "Navigate to draft folder in outlook...";
+			statusLabel.Text = "Navigate to draft folder in outlook...";
 			//ghetto to make the label update
 			Application.Current.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background,
 									  new Action(delegate { }));
 			folderMAPI = outNS.PickFolder();
-			statusLabel.Content = "Ready.";
+			statusLabel.Text = "Ready.";
 			//OutlookFolderDialog ofd = new OutlookFolderDialog();
 			//if (ofd.ShowDialog() == true)
 			//{
@@ -671,7 +682,7 @@ namespace AttachmentMailer
 			}
 			else
 			{
-				statusLabel.Content = "Invalid Outlook draft folder.";
+				statusLabel.Text = "Invalid Outlook draft folder.";
 			}
 		}
 
@@ -687,13 +698,13 @@ namespace AttachmentMailer
 			catch (COMException ex)
 			{
 				Logger.log(TraceEventType.Error, 9, "Word Exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
-				statusLabel.Content = "Word couldn't be accessed. Word not open?";
+				statusLabel.Text = "Word couldn't be accessed. Word not open?";
 				return false;
 			}
 
 			if (wordApp == null)
 			{
-				statusLabel.Content = "Word couldn't be accessed. Word not open?";
+				statusLabel.Text = "Word couldn't be accessed. Word not open?";
 				return false;
 			}
 			return true;
@@ -711,13 +722,13 @@ namespace AttachmentMailer
 			catch (COMException ex)
 			{
 				Logger.log(TraceEventType.Error, 9, "Publisher Exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
-				statusLabel.Content = "Publisher couldn't be accessed. Publisher not open?";
+				statusLabel.Text = "Publisher couldn't be accessed. Publisher not open?";
 				return false;
 			}
 
 			if (pubApp == null)
 			{
-				statusLabel.Content = "Publisher couldn't be accessed. Publisher not open?";
+				statusLabel.Text = "Publisher couldn't be accessed. Publisher not open?";
 				return false;
 			}
 			return true;
@@ -737,13 +748,13 @@ namespace AttachmentMailer
 				catch (COMException ex)
 				{
 					Logger.log(TraceEventType.Error, 9, "Excel exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
-					statusLabel.Content = "Excel couldn't be accessed. Excel not open?";
+					statusLabel.Text = "Excel couldn't be accessed. Excel not open?";
 					return false;
 				}
 
 				if (exApp == null)
 				{
-					statusLabel.Content = "Excel couldn't be accessed. Excel not open?";
+					statusLabel.Text = "Excel couldn't be accessed. Excel not open?";
 					return false;
 				}
 			}
@@ -756,19 +767,19 @@ namespace AttachmentMailer
 			catch (COMException ex)
 			{
 				Logger.log(TraceEventType.Error, 9, "Outlook exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
-				statusLabel.Content = "Outlook couldn't be accessed. Outlook not open?+";
+				statusLabel.Text = "Outlook couldn't be accessed. Outlook not open?+";
 				return false;
 			}
 			if (outApp == null)
 			{
-				statusLabel.Content = "Outlook couldn't be accessed. Outlook not open?";
+				statusLabel.Text = "Outlook couldn't be accessed. Outlook not open?";
 			}
 
 			outNS = outApp.GetNamespace("MAPI");
 
 			if (outNS == null)
 			{
-				statusLabel.Content = "Uh oh... Bad things happened.";
+				statusLabel.Text = "Uh oh... Bad things happened.";
 				return false;
 			}
 			return true;
@@ -788,7 +799,7 @@ namespace AttachmentMailer
 			Directory.CreateDirectory(tempDirectory);
 			Logger.log(TraceEventType.Information, 9, "Temp dir: " + tempDirectory);
 			tempMerge = Path.Combine(tempDirectory, MERGELOC);
-			statusLabel.Content = "Ready.";
+			statusLabel.Text = "Ready.";
 		}
 
 		private void remReplaceButton_Click(object sender, RoutedEventArgs e)
@@ -810,7 +821,7 @@ namespace AttachmentMailer
 
 			if (placeholderText.Text.Equals(""))
 			{
-				statusLabel.Content = "Invalid placeholder.";
+				statusLabel.Text = "Invalid placeholder.";
 				return;
 			}
 			else if (replaceindex == -1)
@@ -852,19 +863,24 @@ namespace AttachmentMailer
 			Outlook.MAPIFolder drafts = outNS.GetDefaultFolder(Outlook.OlDefaultFolders.olFolderDrafts);
 			int count = 0;
 			int max = drafts.Items.Count;
+			string to = "";
 			try
 			{
 				foreach (Outlook._MailItem mi in drafts.Items)
 				{
 					if ((worker.CancellationPending == true)) { e.Cancel = true; break; }
-					if (mi.To != null && !mi.To.Equals("")) { mi.Send(); count = count + 1; }
+					if (mi.To != null && !mi.To.Equals("")) {
+						to = mi.To;
+						Logger.log(TraceEventType.Information, 3, string.Format("Sending to: {0}", to));
+						mi.Send(); count = count + 1;
+					}
 					worker.ReportProgress((int)(((float)count / (float)max) * 100));
 				}
 			}
 			catch (COMException ex)
 			{
 				Logger.log(TraceEventType.Critical, 9, "Outlook exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
-				throw new DataException("Access denied. Try changing Outlook's security settings.");
+				throw new DataException(string.Format("Access denied. Try changing Outlook's security settings. (To: {0}", to));
 			}
 			catch (Exception ex)
 			{
@@ -887,18 +903,18 @@ namespace AttachmentMailer
 		{
 			if (addDocLocationLabel.Content == null || addDocLocationLabel.Content.Equals(""))
 			{
-				statusLabel.Content = "Document missing. Click Browse to locate merge document.";
+				statusLabel.Text = "Document missing. Click Browse to locate merge document.";
 				return;
 			}
 
 			if (!addDocName.Text.EndsWith(".pdf") && !addDocName.Text.EndsWith(".docx"))
 			{
-				statusLabel.Content = "Attachment name must end with .pdf or .docx";
+				statusLabel.Text = "Attachment name must end with .pdf or .docx";
 				return;
 			}
 			else if (addDocName.Text.Equals(""))
 			{
-				statusLabel.Content = "Error: Blank attachment name.";
+				statusLabel.Text = "Error: Blank attachment name.";
 				return;
 			}
 			// check if attachment name already exist in list
@@ -907,14 +923,14 @@ namespace AttachmentMailer
 			{
 				if (d.attachmentFormat.Equals(addDocName.Text))
 				{
-					statusLabel.Content = "Error: Attachment name exists already.";
+					statusLabel.Text = "Error: Attachment name exists already.";
 					return;
 				}
 			}
 			((ObservableCollection<Document>)documentList.ItemsSource)
 					.Add(new Document((string)addDocLocationLabel.Content, addDocName.Text));
 			nukeTempMerges();
-			statusLabel.Content = "Ready.";
+			statusLabel.Text = "Ready.";
 
 		}
 
@@ -938,7 +954,7 @@ namespace AttachmentMailer
 				{
 					addDocLocationLabel.Content = "";
 					Logger.log(TraceEventType.Critical, 9, "File exception\r\n" + ex.GetType() + ":" + ex.Message + "\r\n" + ex.StackTrace);
-					statusLabel.Content = "Error: Could not read file. Original error: " + ex.Message;
+					statusLabel.Text = "Error: Could not read file. Original error: " + ex.Message;
 					return;
 				}
 
@@ -948,7 +964,7 @@ namespace AttachmentMailer
 					addDocLocationLabel.Content = "";
 					return;
 				}
-				statusLabel.Content = "Click Yes in word...";
+				statusLabel.Text = "Click Yes in word...";
 				//ghetto to make the label update
 				Application.Current.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Background,
 											new Action(delegate { }));
@@ -960,14 +976,14 @@ namespace AttachmentMailer
 				if (doc.MailMerge.State == Word.WdMailMergeState.wdMainAndDataSource)
 				{
 					addDocLocationLabel.Content = fileBrowser.FileName;
-					statusLabel.Content = "Ready.";
+					statusLabel.Text = "Ready.";
 					//Console.WriteLine("" + doc.MailMerge.DataSource.DataFields[1].Value + doc.MailMerge.DataSource.DataFields[2].Value +
 					//doc.MailMerge.DataSource.DataFields[3].Value);
 				}
 				else
 				{
 					addDocLocationLabel.Content = "";
-					statusLabel.Content = "Selected document does not have merge data.";
+					statusLabel.Text = "Selected document does not have merge data.";
 				}
 				((Word._Document)doc).Close(SaveChanges: false);
 				Marshal.FinalReleaseComObject(doc);
@@ -1043,7 +1059,7 @@ namespace AttachmentMailer
 		void worker_ProgressChanged(object sender, ProgressChangedEventArgs e)
 		{
 			if (e.UserState != null)
-				statusLabel.Content = e.UserState as String;
+				statusLabel.Text = e.UserState as String;
 			progress.Value = e.ProgressPercentage;
 
 		}
@@ -1246,7 +1262,7 @@ namespace AttachmentMailer
 				string field = match.Value.Trim(new Char[] { '{', '}' }).ToLower();
 				if (field.Equals(""))
 				{
-					statusLabel.Content = "Invalid column name.";
+					statusLabel.Text = "Invalid column name.";
 					return null;
 				}
 				matched = true;
@@ -1273,7 +1289,7 @@ namespace AttachmentMailer
 				ProcessStartInfo psi = new ProcessStartInfo(tempMerge);
 				Process.Start(psi);
 			}
-			else { statusLabel.Content = "Merges not created yet."; }
+			else { statusLabel.Text = "Merges not created yet."; }
 		}
 
 		private String processFloat(String s)

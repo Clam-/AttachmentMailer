@@ -11,7 +11,7 @@
 		</Grid.RowDefinitions>
 		<Grid x:Name="inputSections" Margin="10" Loaded="mainListLayout_Loaded" Grid.Row="0">
 			<Grid.RowDefinitions>
-				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="3*"/>
 				<RowDefinition Height="7*"/>
 				<RowDefinition Height="7*"/>
 				<RowDefinition Height="Auto"/>
@@ -20,14 +20,16 @@
 				<RowDefinition Height="Auto"/>
 				<RowDefinition Height="Auto"/>
 			</Grid.RowDefinitions>
-			<Grid>
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="1*"/>
-					<ColumnDefinition Width="auto"/>
-				</Grid.ColumnDefinitions>
-				<Label x:Name="statusLabel" Content="Status" Grid.Row="0" Grid.Column="0"/>
-				<Button Click="helpButton_Click" x:Name="helpButton" Content="Show help..." Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Padding="5,1" />
-			</Grid>
+			<GroupBox Header="Status" Grid.Row="0" Padding="0">
+				<Grid>
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="1*"/>
+						<ColumnDefinition Width="auto"/>
+					</Grid.ColumnDefinitions>
+					<TextBox x:Name="statusLabel" Text="Status" Grid.Row="0" Grid.Column="0" AcceptsReturn="True" TextWrapping="Wrap" />
+					<Button Click="helpButton_Click" x:Name="helpButton" Content="Show help..." Grid.Row="0" Grid.Column="1" VerticalAlignment="Center" Padding="5,1" />
+				</Grid>
+			</GroupBox>
 			<GroupBox Header="Merged Documents" Grid.Row="1" Padding="5">
 				<Grid>
 					<Grid.RowDefinitions>
