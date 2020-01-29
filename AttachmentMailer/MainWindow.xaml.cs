@@ -248,11 +248,17 @@ namespace AttachmentMailer
 				foreach (Attachment d in ds)
 				{
 					String fname = processAttachmentName(d.attachmentName, row);
+                    String fn = fname;
 					fname = System.IO.Path.Combine(d.location, fname);
 					Logger.log(TraceEventType.Verbose, 1, "\r\nAttaching... " + fname);
 					try
 					{
-						newMI.Attachments.Add(fname);
+                        bool found = false;
+                        foreach (Outlook.Attachment a in newMI.Attachments)
+                        {
+                            if (a.FileName == fn) { found = true; }
+                        }
+                        if (!found) { newMI.Attachments.Add(fname); }
 					}
 					catch (FileNotFoundException)
 					{
@@ -270,7 +276,7 @@ namespace AttachmentMailer
 				// add merge items. only if newitem:
 				if (newItem)
 				{
-					if (mergedocs.ContainsKey(hash))
+					if (mergedocs.Count > 0 && mergedocs.ContainsKey(hash))
 					{
 						foreach (string[] fnames in mergedocs[hash])
 						{
@@ -296,7 +302,7 @@ namespace AttachmentMailer
 							File.Move(nf, fnames[0]);
 						}
 					}
-					else
+					else if (mergedocs.Count > 0)
 					{
 						if (!missingAttachment)
 						{
@@ -322,7 +328,7 @@ namespace AttachmentMailer
                             try
                             {
                                 subject = subject.Replace(dr.placeholder, getCellContent(row.Cells[dr.replacement]));
-                            } catch (NullReferenceException eex)
+                            } catch (NullReferenceException)
                             {
                                 newMI.Close(Outlook.OlInspectorClose.olDiscard);
                                 Marshal.FinalReleaseComObject(newMI);
