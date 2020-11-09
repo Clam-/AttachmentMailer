@@ -391,8 +391,12 @@ namespace AttachmentMailer
 			foreach (String key in keys)
 			{
 				Outlook._MailItem mi = items[key];
-				if (drafts != null) { mi.Move(drafts); }
-				else { mi.Close(Outlook.OlInspectorClose.olDiscard); }
+                if (drafts != null) { mi.Move(drafts); }
+                else
+                {
+                    try { mi.Close(Outlook.OlInspectorClose.olDiscard); }
+                    catch (System.Runtime.InteropServices.InvalidComObjectException e) { }
+                }
 				items.Remove(key);
 				Marshal.FinalReleaseComObject(mi);
 			}
